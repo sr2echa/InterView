@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>InterView Monitor</title>
+    <style>
+      :root {
+        --bg-primary: #000000;
+        --bg-secondary: #121212;
+        --text-primary: rgba(255, 255, 255, 0.87);
+        --text-secondary: rgba(255, 255, 255, 0.6);
+        --accent: #3d5afe;
+        --accent-light: #536dfe;
+        --border: rgba(255, 255, 255, 0.12);
+        --card-bg: #1e1e1e;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Oxygen, Ubuntu, Cantarell, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        height: 100vh;
+        padding: 2rem;
+      }
+
+      .content {
+        max-width: 900px;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.5rem;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 1rem;
+      }
+
+      .title {
+        font-size: 1.8rem;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+      }
+
+      .subtitle {
+        color: var(--text-secondary);
+        font-size: 1rem;
+      }
+
+      .code-area {
+        position: relative;
+      }
+
+      .code-input {
+        width: 200px;
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid var(--border);
+        color: var(--text-primary);
+        font-size: 2rem;
+        text-align: center;
+        letter-spacing: 0.5rem;
+        padding: 0.5rem;
+        transition: border-color 0.3s;
+      }
+
+      .code-input:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+
+      .action-btn {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1px solid var(--border);
+        padding: 0.75rem 2rem;
+        font-size: 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .action-btn:hover {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: var(--accent);
+      }
+
+      .action-btn.primary {
+        background: var(--accent);
+        color: white;
+        border: none;
+      }
+
+      .action-btn.primary:hover {
+        background: var(--accent-light);
+      }
+
+      .random-btn {
+        position: absolute;
+        right: -40px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        color: var(--accent);
+        font-size: 1.2rem;
+      }
+
+      .info-panel {
+        width: 100%;
+        background-color: var(--bg-secondary);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        opacity: 0.9;
+      }
+
+      .monitor-count {
+        font-size: 1rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.5rem;
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .monitors-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1rem;
+        width: 100%;
+      }
+
+      .monitor-item {
+        background-color: var(--card-bg);
+        border-radius: 8px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .monitor-info {
+        padding: 0.5rem;
+        background: rgba(0, 0, 0, 0.5);
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        font-size: 0.85rem;
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .preview-video {
+        width: 100%;
+        height: 160px;
+        background-color: #111;
+        object-fit: cover;
+      }
+
+      .status-log {
+        width: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        padding: 0.75rem;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.85rem;
+        color: var(--accent-light);
+        max-height: 100px;
+        overflow-y: auto;
+      }
+
+      .connection-status {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background-color: var(--bg-secondary);
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        opacity: 0.8;
+      }
+
+      .status-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 0.5rem;
+      }
+
+      .status-indicator.disconnected {
+        background-color: #f44336;
+      }
+
+      .status-indicator.connected {
+        background-color: #4caf50;
+      }
+
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="connection-status">
+      <div class="status-indicator disconnected" id="status-indicator"></div>
+      <span id="connection-status-text">Disconnected</span>
+    </div>
+
+    <div class="content">
+      <div class="header">
+        <h1 class="title">InterView Monitor</h1>
+        <p class="subtitle">Client-side screen monitoring</p>
+      </div>
+
+      <div class="code-area">
+        <input
+          id="code-input"
+          class="code-input"
+          maxlength="6"
+          placeholder="------"
+        />
+        <button id="random-code-btn" class="random-btn">🎲</button>
+      </div>
+
+      <button id="connect-btn" class="action-btn primary">Connect</button>
+
+      <div class="info-panel">
+        <div class="monitor-count">
+          <span id="monitor-count">Detecting monitors...</span>
+          <span id="external-monitor-count"></span>
+        </div>
+      </div>
+
+      <div id="monitors-list" class="monitors-list"></div>
+
+      <div id="status-log" class="status-log"></div>
+    </div>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>

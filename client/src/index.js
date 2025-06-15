@@ -1,145 +1,3 @@
-// const {
-//   app,
-//   BrowserWindow,
-//   ipcMain,
-//   desktopCapturer,
-//   dialog,
-// } = require("electron");
-// const path = require("path");
-// const WebSocket = require("ws");
-
-// let mainWindow;
-// let ws;
-// let peer;
-// let code = null;
-
-// function createWindow() {
-//   mainWindow = new BrowserWindow({
-//     width: 1000,
-//     height: 700,
-//     backgroundColor: "#000000",
-//     webPreferences: {
-//       preload: path.join(__dirname, "preload.js"),
-//       contextIsolation: true,
-//     },
-//   });
-
-//   mainWindow.loadFile(path.join(__dirname, "index.html"));
-// }
-
-// async function askForCode() {
-//   const { response, checkboxChecked } = await dialog.showMessageBox({
-//     type: "question",
-//     buttons: ["OK"],
-//     defaultId: 0,
-//     title: "Enter Code",
-//     message: "Please enter the 6-digit code in the console",
-//     detail: "You need to manually input it in the terminal for now.",
-//   });
-
-//   const input = await new Promise((resolve) => {
-//     process.stdout.write("Enter 6-digit code: ");
-//     process.stdin.once("data", (data) => resolve(data.toString().trim()));
-//   });
-
-//   return input;
-// }
-
-// async function startConnection() {
-//   ws = new WebSocket("ws://localhost:3001");
-
-//   ws.on("open", async () => {
-//     console.log("🔗 Connected to signaling server");
-
-//     code = await askForCode();
-
-//     ws.send(
-//       JSON.stringify({
-//         type: "register",
-//         code,
-//       })
-//     );
-
-//     await startStreaming();
-//   });
-
-//   ws.on("message", async (data) => {
-//     const { type, payload } = JSON.parse(data);
-
-//     if (type === "connect") {
-//       const offer = await peer.createOffer();
-//       await peer.setLocalDescription(offer);
-
-//       ws.send(
-//         JSON.stringify({
-//           type: "signal",
-//           code,
-//           payload: offer,
-//         })
-//       );
-//     }
-
-//     if (type === "signal") {
-//       if (payload.type === "answer") {
-//         await peer.setRemoteDescription(new RTCSessionDescription(payload));
-//       } else if (payload.candidate) {
-//         await peer.addIceCandidate(new RTCIceCandidate(payload));
-//       }
-//     }
-//   });
-// }
-
-// async function startStreaming() {
-//   peer = new RTCPeerConnection({
-//     iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-//   });
-
-//   const sources = await desktopCapturer.getSources({ types: ["screen"] });
-
-//   for (const source of sources) {
-//     const stream = await navigator.mediaDevices.getUserMedia({
-//       audio: false,
-//       video: {
-//         mandatory: {
-//           chromeMediaSource: "desktop",
-//           chromeMediaSourceId: source.id,
-//         },
-//       },
-//     });
-
-//     stream.getTracks().forEach((track) => {
-//       peer.addTrack(track, stream);
-//     });
-//   }
-
-//   peer.onicecandidate = (event) => {
-//     if (event.candidate) {
-//       ws.send(
-//         JSON.stringify({
-//           type: "signal",
-//           code,
-//           payload: event.candidate,
-//         })
-//       );
-//     }
-//   };
-
-//   console.log("🖥️ Streaming screens...");
-// }
-
-// app.whenReady().then(() => {
-//   createWindow();
-//   startConnection();
-
-//   app.on("activate", () => {
-//     if (BrowserWindow.getAllWindows().length === 0) createWindow();
-//   });
-// });
-
-// app.on("window-all-closed", () => {
-//   if (process.platform !== "darwin") app.quit();
-// });
-
 const {
   app,
   BrowserWindow,
@@ -148,10 +6,17 @@ const {
   screen,
 } = require("electron");
 const path = require("path");
-const crypto = require("crypto");
+const { execFile } = require("child_process");
+const {
+  getDetailedDisplayInfo,
+  setupDisplayMonitoring,
+} = require("./displayUtils");
+
+let previousDisplayConfig = [];
+let mainWindow;
 
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 900,
     height: 700,
     backgroundColor: "#000000",
@@ -161,24 +26,79 @@ function createWindow() {
       nodeIntegration: false,
     },
     autoHideMenuBar: true,
+    frame: false,
+    resizable: true,
+    minimizable: true,
+    maximizable: true,
+    closable: true,
+    title: "InterView Monitor",
+    transparent: false,
+    roundedCorners: true,
   });
 
-  win.loadFile(path.join(__dirname, "index.html"));
+  mainWindow.loadFile(path.join(__dirname, "index.html"));
+
+  setupDisplayMonitoring(mainWindow);
 }
 
 app.whenReady().then(() => {
   createWindow();
+
+  previousDisplayConfig = getDisplayConfigFingerprint();
+
+  screen.on("display-added", handleDisplayChange);
+  screen.on("display-removed", handleDisplayChange);
+  screen.on("display-metrics-changed", handleDisplayChange);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
+function getDisplayConfigFingerprint() {
+  const displays = screen.getAllDisplays();
+  return displays
+    .map(
+      (d) =>
+        `${d.id}-${d.bounds.width}x${d.bounds.height}-${
+          d.internal ? "int" : "ext"
+        }`
+    )
+    .sort()
+    .join("|");
+}
+
+function handleDisplayChange() {
+  const currentConfig = getDisplayConfigFingerprint();
+
+  if (currentConfig !== previousDisplayConfig) {
+    console.log("🖥️ Display configuration changed");
+    previousDisplayConfig = currentConfig;
+
+    setTimeout(async () => {
+      try {
+        const displayInfo = await getDetailedDisplayInfo();
+        BrowserWindow.getAllWindows().forEach((win) => {
+          if (!win.isDestroyed()) {
+            win.webContents.send("display-configuration-changed", displayInfo);
+          }
+        });
+      } catch (err) {
+        console.error("Error getting display info for change event:", err);
+        BrowserWindow.getAllWindows().forEach((win) => {
+          if (!win.isDestroyed()) {
+            win.webContents.send("display-configuration-changed");
+          }
+        });
+      }
+    }, 500);
+  }
+}
+
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-// Get all desktop capturer sources (screens)
 ipcMain.handle("get-sources", async () => {
   return await desktopCapturer.getSources({
     types: ["screen"],
@@ -187,7 +107,6 @@ ipcMain.handle("get-sources", async () => {
   });
 });
 
-// Get all system displays with detailed info
 ipcMain.handle("get-displays", async () => {
   const displays = screen.getAllDisplays();
   return displays.map((display) => {
@@ -206,7 +125,141 @@ ipcMain.handle("get-displays", async () => {
   });
 });
 
-// Generate a 6-digit code
-ipcMain.handle("generate-code", async () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+ipcMain.handle("get-processes", async () => {
+  return new Promise((resolve, reject) => {
+    let command;
+    let args = [];
+
+    if (process.platform === "win32") {
+      command = "powershell.exe";
+      args = [
+        "-NoProfile",
+        "-Command",
+        "Get-Process | Select-Object Id, ProcessName, @{Name='WindowTitle';Expression={$_.MainWindowTitle}}, @{Name='Memory';Expression={[math]::Round($_.WorkingSet64 / 1MB, 2)}}, @{Name='CPU';Expression={$_.CPU}} | Sort-Object -Descending Memory | ConvertTo-Json -Depth 1",
+      ];
+    } else if (process.platform === "darwin") {
+      command = "ps";
+      args = ["-axo", "pid,comm,%cpu,%mem", "--sort=-%mem"];
+    } else {
+      command = "ps";
+      args = ["-axo", "pid,comm,%cpu,%mem", "--sort=-%mem"];
+    }
+
+    execFile(
+      command,
+      args,
+      { maxBuffer: 1024 * 1024 * 5 },
+      (error, stdout, stderr) => {
+        if (error) {
+          console.error(`Error getting processes: ${error}`);
+          resolve([]);
+          return;
+        }
+
+        try {
+          let processes = [];
+
+          if (process.platform === "win32") {
+            try {
+              processes = JSON.parse(stdout);
+              if (!Array.isArray(processes)) {
+                processes = [processes];
+              }
+            } catch (e) {
+              console.error("Failed to parse Windows process JSON:", e);
+              processes = [];
+            }
+          } else {
+            const lines = stdout.trim().split("\n").slice(1);
+            processes = lines.map((line) => {
+              const [pid, comm, cpu, mem] = line.trim().split(/\s+/);
+              return {
+                Id: parseInt(pid, 10),
+                ProcessName: comm,
+                CPU: parseFloat(cpu),
+                Memory: parseFloat(mem),
+              };
+            });
+          }
+
+          const topProcesses = processes
+            .filter((p) => p.Id !== process.pid)
+            .slice(0, 100);
+
+          resolve(topProcesses);
+        } catch (err) {
+          console.error(`Error parsing process list: ${err}`);
+          resolve([]);
+        }
+      }
+    );
+  });
+});
+
+ipcMain.handle("get-detailed-displays", async () => {
+  try {
+    return await getDetailedDisplayInfo();
+  } catch (error) {
+    console.error("Error getting detailed display info:", error);
+    return {
+      total: 0,
+      primary: null,
+      external: 0,
+      internal: 0,
+      active: 0,
+      inactive: 0,
+      displays: [],
+    };
+  }
+});
+
+ipcMain.handle("window-minimize", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.minimize();
+  }
+});
+
+ipcMain.handle("window-maximize", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+
+ipcMain.handle("window-close", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.close();
+  }
+});
+
+ipcMain.handle("window-is-maximized", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    return mainWindow.isMaximized();
+  }
+  return false;
+});
+
+ipcMain.on("window-minimize", () => {
+  if (mainWindow) {
+    mainWindow.minimize();
+  }
+});
+
+ipcMain.on("window-maximize", () => {
+  if (mainWindow) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+
+ipcMain.on("window-close", () => {
+  if (mainWindow) {
+    mainWindow.close();
+  }
 });

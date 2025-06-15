@@ -3,250 +3,250 @@
   <head>
     <meta charset="UTF-8" />
     <title>InterView Monitor</title>
-    <style>
-      :root {
-        --bg-primary: #000000;
-        --bg-secondary: #121212;
-        --text-primary: rgba(255, 255, 255, 0.87);
-        --text-secondary: rgba(255, 255, 255, 0.6);
-        --accent: #3d5afe;
-        --accent-light: #536dfe;
-        --border: rgba(255, 255, 255, 0.12);
-        --card-bg: #1e1e1e;
-      }
-
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-
-      body {
-        background-color: var(--bg-primary);
-        color: var(--text-primary);
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          Oxygen, Ubuntu, Cantarell, sans-serif;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        height: 100vh;
-        padding: 2rem;
-      }
-
-      .content {
-        max-width: 900px;
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 1.5rem;
-      }
-
-      .header {
-        text-align: center;
-        margin-bottom: 1rem;
-      }
-
-      .title {
-        font-size: 1.8rem;
-        font-weight: 500;
-        margin-bottom: 0.5rem;
-      }
-
-      .subtitle {
-        color: var(--text-secondary);
-        font-size: 1rem;
-      }
-
-      .code-area {
-        position: relative;
-      }
-
-      .code-input {
-        width: 200px;
-        background: transparent;
-        border: none;
-        border-bottom: 2px solid var(--border);
-        color: var(--text-primary);
-        font-size: 2rem;
-        text-align: center;
-        letter-spacing: 0.5rem;
-        padding: 0.5rem;
-        transition: border-color 0.3s;
-      }
-
-      .code-input:focus {
-        outline: none;
-        border-color: var(--accent);
-      }
-
-      .action-btn {
-        background: transparent;
-        color: var(--text-primary);
-        border: 1px solid var(--border);
-        padding: 0.75rem 2rem;
-        font-size: 1rem;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: all 0.2s;
-      }
-
-      .action-btn:hover {
-        background: rgba(255, 255, 255, 0.05);
-        border-color: var(--accent);
-      }
-
-      .action-btn.primary {
-        background: var(--accent);
-        color: white;
-        border: none;
-      }
-
-      .action-btn.primary:hover {
-        background: var(--accent-light);
-      }
-
-      .random-btn {
-        position: absolute;
-        right: -40px;
-        top: 50%;
-        transform: translateY(-50%);
-        background: transparent;
-        border: none;
-        cursor: pointer;
-        color: var(--accent);
-        font-size: 1.2rem;
-      }
-
-      .info-panel {
-        width: 100%;
-        background-color: var(--bg-secondary);
-        border-radius: 8px;
-        padding: 1rem;
-        margin-bottom: 1rem;
-        opacity: 0.9;
-      }
-
-      .monitor-count {
-        font-size: 1rem;
-        color: var(--text-secondary);
-        margin-bottom: 0.5rem;
-        display: flex;
-        justify-content: space-between;
-      }
-
-      .monitors-list {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 1rem;
-        width: 100%;
-      }
-
-      .monitor-item {
-        background-color: var(--card-bg);
-        border-radius: 8px;
-        overflow: hidden;
-        position: relative;
-      }
-
-      .monitor-info {
-        padding: 0.5rem;
-        background: rgba(0, 0, 0, 0.5);
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        font-size: 0.85rem;
-        display: flex;
-        justify-content: space-between;
-      }
-
-      .preview-video {
-        width: 100%;
-        height: 160px;
-        background-color: #111;
-        object-fit: cover;
-      }
-
-      .status-log {
-        width: 100%;
-        background-color: rgba(0, 0, 0, 0.5);
-        padding: 0.75rem;
-        border-radius: 4px;
-        font-family: monospace;
-        font-size: 0.85rem;
-        color: var(--accent-light);
-        max-height: 100px;
-        overflow-y: auto;
-      }
-
-      .connection-status {
-        position: absolute;
-        top: 1rem;
-        right: 1rem;
-        background-color: var(--bg-secondary);
-        padding: 0.5rem 1rem;
-        border-radius: 4px;
-        font-size: 0.8rem;
-        display: flex;
-        align-items: center;
-        opacity: 0.8;
-      }
-
-      .status-indicator {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        margin-right: 0.5rem;
-      }
-
-      .status-indicator.disconnected {
-        background-color: #f44336;
-      }
-
-      .status-indicator.connected {
-        background-color: #4caf50;
-      }
-
-      .hidden {
-        display: none;
-      }
-    </style>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="connection-status">
-      <div class="status-indicator disconnected" id="status-indicator"></div>
-      <span id="connection-status-text">Disconnected</span>
+    <div id="title-bar" class="title-bar">
+      <div class="title-bar-left">
+        <svg
+          class="title-bar-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M6 20.25h12m-7.5-3v3m3-3v3m-10.125-3h17.25c.621 0 1.125-.504 1.125-1.125V4.875c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125z"
+          />
+        </svg>
+      </div>
+      <div class="title-bar-controls">
+        <button id="minimize-btn" class="title-bar-btn minimize">
+          <svg
+            viewBox="0 0 12 12"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1"
+          >
+            <line x1="2" y1="6" x2="10" y2="6"></line>
+          </svg>
+        </button>
+        <button id="maximize-btn" class="title-bar-btn maximize">
+          <svg
+            viewBox="0 0 12 12"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1"
+          >
+            <rect x="2" y="2" width="8" height="8"></rect>
+          </svg>
+        </button>
+        <button id="close-btn" class="title-bar-btn close">
+          <svg
+            viewBox="0 0 12 12"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1"
+          >
+            <line x1="2" y1="2" x2="10" y2="10"></line>
+            <line x1="10" y1="2" x2="2" y2="10"></line>
+          </svg>
+        </button>
+      </div>
     </div>
 
-    <div class="content">
-      <div class="header">
+    <div id="code-entry-container" class="code-entry-container">
+      <div class="code-entry-card">
+        <svg
+          class="logo"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M6 20.25h12m-7.5-3v3m3-3v3m-10.125-3h17.25c.621 0 1.125-.504 1.125-1.125V4.875c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125z"
+          />
+        </svg>
         <h1 class="title">InterView Monitor</h1>
-        <p class="subtitle">Client-side screen monitoring</p>
+        <p class="subtitle">
+          Enter your 6-digit code to connect to the interview session
+        </p>
+
+        <div class="code-input-container">
+          <div class="code-input-group">
+            <input
+              type="text"
+              class="code-input"
+              maxlength="1"
+              pattern="[0-9]"
+              inputmode="numeric"
+            />
+            <input
+              type="text"
+              class="code-input"
+              maxlength="1"
+              pattern="[0-9]"
+              inputmode="numeric"
+            />
+            <input
+              type="text"
+              class="code-input"
+              maxlength="1"
+              pattern="[0-9]"
+              inputmode="numeric"
+            />
+            <input
+              type="text"
+              class="code-input"
+              maxlength="1"
+              pattern="[0-9]"
+              inputmode="numeric"
+            />
+            <input
+              type="text"
+              class="code-input"
+              maxlength="1"
+              pattern="[0-9]"
+              inputmode="numeric"
+            />
+            <input
+              type="text"
+              class="code-input"
+              maxlength="1"
+              pattern="[0-9]"
+              inputmode="numeric"
+            />
+          </div>
+          <p class="paste-hint">You can also paste a 6-digit code</p>
+        </div>
+
+        <button id="submit-btn" class="submit-btn" disabled>Connect</button>
       </div>
+    </div>
 
-      <div class="code-area">
-        <input
-          id="code-input"
-          class="code-input"
-          maxlength="6"
-          placeholder="------"
-        />
-        <button id="random-code-btn" class="random-btn">🎲</button>
-      </div>
+    <div id="dashboard-container" class="dashboard-container">
+      <header class="dashboard-header">
+        <div class="header-left">
+          <svg
+            class="header-logo"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M6 20.25h12m-7.5-3v3m3-3v3m-10.125-3h17.25c.621 0 1.125-.504 1.125-1.125V4.875c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125z"
+            />
+          </svg>
+          <div class="status-indicator">
+            <div id="status-dot" class="status-dot"></div>
+            <span id="status-text">Disconnected</span>
+          </div>
+        </div>
 
-      <button id="connect-btn" class="action-btn primary">Connect</button>
+        <div class="header-right">
+          <div id="code-display" class="code-display">------</div>
 
-      <div class="info-panel">
-        <div class="monitor-count">
-          <span id="monitor-count">Detecting monitors...</span>
-          <span id="external-monitor-count"></span>
+          <div id="viewer-count" class="status-indicator" style="display: none">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <span id="viewer-count-text">0 viewers</span>
+          </div>
+
+          <button id="toggle-logs-btn" class="toggle-logs-btn">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M12 5v14M5 12h14"></path>
+            </svg>
+            <span>Show Logs</span>
+          </button>
+
+          <button id="disconnect-btn" class="disconnect-btn">Disconnect</button>
+        </div>
+      </header>
+      <main class="dashboard-content">
+        <div class="dashboard-layout">
+          <section class="stats-section">
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div id="total-displays" class="stat-value">0</div>
+                <div class="stat-label">Total Displays</div>
+              </div>
+              <div class="stat-card">
+                <div id="active-displays" class="stat-value">0</div>
+                <div class="stat-label">Active Displays</div>
+              </div>
+              <div class="stat-card">
+                <div id="internal-displays" class="stat-value">0</div>
+                <div class="stat-label">Internal Displays</div>
+              </div>
+              <div class="stat-card">
+                <div id="external-displays" class="stat-value">0</div>
+                <div class="stat-label">External Displays</div>
+              </div>
+              <div class="stat-card">
+                <div id="inactive-displays" class="stat-value">0</div>
+                <div class="stat-label">Inactive Displays</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="monitor-preview-section">
+            <div class="preview-container">
+              <div id="monitor-list" class="monitor-list">
+                <!-- Monitor items -->
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <!-- Sliding Log Panel -->
+      <div id="logs-panel" class="logs-panel">
+        <div class="logs-header">
+          <h2 class="logs-title">Connection Log</h2>
+          <button id="close-logs-btn" class="close-logs-btn">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <div class="logs-content">
+          <div id="log-container" class="log-container">
+            <!-- Logs -->
+          </div>
         </div>
       </div>
-
-      <div id="monitors-list" class="monitors-list"></div>
-
-      <div id="status-log" class="status-log"></div>
     </div>
 
     <script src="./renderer.js"></script>

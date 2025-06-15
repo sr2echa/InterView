@@ -1,220 +1,288 @@
 // Global variables for WebRTC and WebSocket connections
 let ws;
 let peer;
-let currentCode;
+let currentCode = "";
 let reconnectInterval;
 let allDisplays = [];
 let allScreens = [];
 let activeStreams = [];
 let isConnected = false;
+let isUpdatingStreams = false;
+let lastLogMessage = "";
+let connectionTimeoutId = null;
 
-// UI elements
-const statusIndicator = document.getElementById("status-indicator");
-const connectionStatusText = document.getElementById("connection-status-text");
-const logElm = document.getElementById("status-log");
-const codeInput = document.getElementById("code-input");
-const randomCodeBtn = document.getElementById("random-code-btn");
-const connectBtn = document.getElementById("connect-btn");
-const monitorCountElm = document.getElementById("monitor-count");
-const externalMonitorCountElm = document.getElementById(
-  "external-monitor-count"
-);
-const monitorsListElm = document.getElementById("monitors-list");
+// UI elements - will be initialized when DOM is ready
+let codeEntryContainer;
+let dashboardContainer;
+let codeInputs;
+let submitBtn;
+let disconnectBtn;
+let statusDot;
+let statusText;
+let codeDisplay;
+let logContainer;
+let monitorList;
 
-// Logging function that updates the status log UI
-function logStatus(msg) {
-  if (logElm) {
-    const now = new Date();
-    const timestamp = `${String(now.getHours()).padStart(2, "0")}:${String(
-      now.getMinutes()
-    ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+// Stat elements - will be initialized when DOM is ready
+let totalDisplaysEl;
+let activeDisplaysEl;
+let internalDisplaysEl;
+let externalDisplaysEl;
+let activeStreamsEl;
+// Variable for Total Displays is already defined above
+let inactiveDisplaysEl;
 
-    const logEntry = document.createElement("div");
-    logEntry.innerHTML = `<span style="color:#888">[${timestamp}]</span> ${msg}`;
-    logElm.appendChild(logEntry);
-    logElm.scrollTop = logElm.scrollHeight;
-  }
-  console.log(msg);
-}
+// Title bar controls and logs panel
+let minimizeBtn;
+let maximizeBtn;
+let closeBtn;
+let toggleLogsBtn;
+let closeLogsBtn;
+let logsPanel;
 
-// Set connection status in the UI
-function updateConnectionStatus(connected, viewerCount = 0) {
-  isConnected = connected;
-  statusIndicator.className = `status-indicator ${
-    connected ? "connected" : "disconnected"
-  }`;
+// Initialize the application when DOM is loaded
+document.addEventListener("DOMContentLoaded", initializeApp);
 
-  if (connected) {
-    connectionStatusText.textContent = `Connected${
-      viewerCount ? ` (${viewerCount} viewer${viewerCount > 1 ? "s" : ""})` : ""
-    }`;
-    connectBtn.textContent = "Disconnect";
-  } else {
-    connectionStatusText.textContent = "Disconnected";
-    connectBtn.textContent = "Connect";
-  }
-}
+function initializeApp() {
+  console.log("Initializing app...");
 
-// Get all monitors and display their info
-async function updateMonitorInfo() {
-  try {
-    allDisplays = await window.electronAPI.getDisplays();
-    allScreens = await window.electronAPI.getScreens();
+  // Initialize UI elements
+  codeEntryContainer = document.getElementById("code-entry-container");
+  dashboardContainer = document.getElementById("dashboard-container");
+  codeInputs = document.querySelectorAll(".code-input");
+  submitBtn = document.getElementById("submit-btn");
+  disconnectBtn = document.getElementById("disconnect-btn");
+  statusDot = document.getElementById("status-dot");
+  statusText = document.getElementById("status-text");
+  codeDisplay = document.getElementById("code-display");
+  logContainer = document.getElementById("log-container");
+  monitorList = document.getElementById("monitor-list");
+  activeStreamsEl = document.getElementById("active-streams");
 
-    const totalMonitors = allDisplays.length;
-    const externalMonitors = allDisplays.filter((d) => !d.internal).length;
+  // Set up window controls for custom title bar
+  setupWindowControls();
 
-    // Update monitor count display
-    monitorCountElm.textContent = `Total Monitors: ${totalMonitors}`;
-    externalMonitorCountElm.textContent = `External Monitors: ${externalMonitors}`;
+  console.log("UI elements found:", {
+    codeEntryContainer: !!codeEntryContainer,
+    dashboardContainer: !!dashboardContainer,
+    codeInputs: codeInputs.length,
+    submitBtn: !!submitBtn,
+    disconnectBtn: !!disconnectBtn,
+    statusDot: !!statusDot,
+    statusText: !!statusText,
+    codeDisplay: !!codeDisplay,
+    logContainer: !!logContainer,
+    monitorList: !!monitorList,
+  });
 
-    // Clear and rebuild monitors list
-    monitorsListElm.innerHTML = "";
+  // Stat elements
+  totalDisplaysEl = document.getElementById("total-displays");
+  activeDisplaysEl = document.getElementById("active-displays");
+  internalDisplaysEl = document.getElementById("internal-displays");
+  externalDisplaysEl = document.getElementById("external-displays");
+  activeStreamsEl = document.getElementById("active-streams");
 
-    for (const [idx, screen] of allScreens.entries()) {
-      const matchingDisplay = allDisplays.find((d) => {
-        // Try to match display with screen based on bounds
-        const screenName = screen.name || "";
-        return screenName.includes(`${d.bounds.width}x${d.bounds.height}`);
-      });
+  // New stat elements
+  // totalDisplaysEl is set earlier  inactiveDisplaysEl = document.getElementById("inactive-displays");
 
-      const isInternal = matchingDisplay ? matchingDisplay.internal : false;
-      const resolution = matchingDisplay
-        ? `${matchingDisplay.bounds.width}x${matchingDisplay.bounds.height}`
-        : "Unknown";
-      const scale = matchingDisplay ? `${matchingDisplay.scaleFactor}x` : "";
-
-      const monitorItem = document.createElement("div");
-      monitorItem.className = "monitor-item";
-      monitorItem.innerHTML = `
-        <div class="monitor-info">
-          <span>Monitor ${idx + 1} (${
-        isInternal ? "Internal" : "External"
-      })</span>
-          <span>${resolution} ${scale}</span>
-        </div>
-        <video id="preview-${
-          screen.id
-        }" class="preview-video" autoplay muted playsinline></video>
-      `;
-
-      monitorsListElm.appendChild(monitorItem);
-    }
-
-    // Send monitor info to the server if connected
-    if (ws && ws.readyState === WebSocket.OPEN && currentCode) {
-      ws.send(
-        JSON.stringify({
-          type: "monitorInfo",
-          code: currentCode,
-          payload: {
-            totalMonitors,
-            externalMonitors,
-            displays: allDisplays.map((d) => ({
-              id: d.id,
-              internal: d.internal,
-              bounds: d.bounds,
-              scaleFactor: d.scaleFactor,
-            })),
-          },
-        })
-      );
-    }
-
-    return { screens: allScreens, displays: allDisplays };
-  } catch (err) {
-    logStatus(`❌ Error getting display info: ${err.message}`);
-    return { screens: [], displays: [] };
-  }
-}
-
-// Generate a random code
-async function generateRandomCode() {
-  try {
-    const code = await window.electronAPI.generateCode();
-    codeInput.value = code;
-    logStatus(`🎲 Generated random code: ${code}`);
-    return code;
-  } catch (err) {
-    logStatus(`❌ Failed to generate code: ${err.message}`);
-    return null;
-  }
-}
-
-// Main function to start the connection
-async function startConnection() {
-  // Don't allow new connections if we're already connected
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    logStatus("Already connected!");
-    return;
+  // Ensure the code entry screen is visible initially
+  if (codeEntryContainer) {
+    codeEntryContainer.style.display = "flex";
+    codeEntryContainer.classList.remove("hidden");
+    console.log("Code entry container made visible");
   }
 
-  const code = codeInput.value.trim();
-  if (code.length !== 6) {
-    logStatus("❌ Please enter a 6-digit code");
-    return;
+  // Ensure the dashboard is hidden initially
+  if (dashboardContainer) {
+    dashboardContainer.style.display = "none";
+    dashboardContainer.classList.remove("visible");
+    console.log("Dashboard container hidden");
   }
 
-  currentCode = code;
+  setupCodeInputs();
+  setupEventListeners();
+  logStatus("Application initialized", "success");
 
-  // Update display info before connecting
-  const { screens, displays } = await updateMonitorInfo();
-  if (screens.length === 0) {
-    logStatus("❌ No screens detected");
-    return;
-  }
+  // Enhanced initialization with retry
+  const initializeDisplays = async () => {
+    let attempts = 0;
+    const maxAttempts = 5;
 
-  logStatus(
-    `🖥️ Detected ${screens.length} screen(s): ${screens
-      .map((s, i) => `Monitor ${i + 1}`)
-      .join(", ")}`
-  );
-
-  // Clear existing streams
-  activeStreams = [];
-
-  try {
-    // Capture streams for all screens
-    for (const [idx, screen] of screens.entries()) {
+    while (attempts < maxAttempts) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: {
-            mandatory: {
-              chromeMediaSource: "desktop",
-              chromeMediaSourceId: screen.id,
-              minWidth: 1280,
-              maxWidth: 1920,
-              minHeight: 720,
-              maxHeight: 1080,
-            },
-          },
-        });
+        await updateDisplayInfo(true); // Force initial update with full detection
 
-        activeStreams.push({ id: screen.id, index: idx, stream });
+        // Verify we got some display data
+        if (allDisplays && allDisplays.length > 0) {
+          logStatus(
+            `Display initialization successful: ${allDisplays.length} displays detected`,
+            "success"
+          );
+          break;
+        }
 
-        // Show preview
-        const videoEl = document.getElementById(`preview-${screen.id}`);
-        if (videoEl) videoEl.srcObject = stream;
-
-        logStatus(`✅ Captured screen ${idx + 1}`);
-      } catch (err) {
-        logStatus(`⚠️ Failed to capture screen ${idx + 1}: ${err.message}`);
+        attempts++;
+        if (attempts < maxAttempts) {
+          logStatus(
+            `Display initialization attempt ${attempts} failed, retrying...`,
+            "warning"
+          );
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+      } catch (error) {
+        attempts++;
+        logStatus(
+          `Display initialization error (attempt ${attempts}): ${error.message}`,
+          "error"
+        );
+        if (attempts < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
       }
     }
 
-    if (activeStreams.length === 0) {
-      logStatus("❌ Failed to capture any screens");
-      return;
+    if (attempts >= maxAttempts) {
+      logStatus("Display initialization failed after all attempts", "error");
     }
+  };
 
-    // Connect to signaling server
-    ws = new WebSocket("ws://localhost:3001");
+  // Start initialization
+  initializeDisplays();
+}
+
+// Helper function to clear reconnect interval
+function clearReconnectInterval() {
+  if (reconnectInterval) {
+    clearTimeout(reconnectInterval);
+    reconnectInterval = null;
+  }
+}
+
+// Setup code input functionality with paste support
+function setupCodeInputs() {
+  codeInputs.forEach((input, index) => {
+    input.addEventListener("input", (e) => {
+      let value = e.target.value.replace(/\D/g, "");
+      if (value.length > 1) {
+        // Paste event or fast typing
+        const chars = value.split("");
+        for (let i = 0; i < codeInputs.length; i++) {
+          codeInputs[i].value = chars[i] || "";
+          codeInputs[i].classList.toggle("filled", !!chars[i]);
+        }
+        if (chars.length === codeInputs.length) {
+          codeInputs[codeInputs.length - 1].focus();
+        } else {
+          codeInputs[chars.length].focus();
+        }
+      } else {
+        // Single char
+        e.target.value = value;
+        input.classList.toggle("filled", !!value);
+        if (value && index < codeInputs.length - 1) {
+          codeInputs[index + 1].focus();
+        }
+      }
+      updateCodeInput();
+    });
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Backspace") {
+        if (!input.value && index > 0) {
+          codeInputs[index - 1].focus();
+        }
+      } else if (e.key === "ArrowLeft" && index > 0) {
+        codeInputs[index - 1].focus();
+      } else if (e.key === "ArrowRight" && index < codeInputs.length - 1) {
+        codeInputs[index + 1].focus();
+      } else if (e.key === "Enter" && isCodeComplete()) {
+        connectToSession();
+      }
+    });
+
+    input.addEventListener("paste", (e) => {
+      e.preventDefault();
+      const pasted = e.clipboardData
+        .getData("text")
+        .replace(/\D/g, "")
+        .slice(0, codeInputs.length);
+      for (let i = 0; i < codeInputs.length; i++) {
+        codeInputs[i].value = pasted[i] || "";
+        codeInputs[i].classList.toggle("filled", !!pasted[i]);
+      }
+      updateCodeInput();
+      if (pasted.length === codeInputs.length) {
+        submitBtn.focus();
+      } else if (pasted.length > 0) {
+        codeInputs[pasted.length].focus();
+      }
+    });
+  });
+}
+
+function distributeCode(code) {
+  codeInputs.forEach((input, index) => {
+    input.value = code[index] || "";
+    input.classList.toggle("filled", !!input.value);
+  });
+  updateCodeInput();
+
+  if (code.length === 6) {
+    submitBtn.focus();
+  }
+}
+
+function updateCodeInput() {
+  currentCode = Array.from(codeInputs)
+    .map((input) => input.value)
+    .join("");
+  submitBtn.disabled = currentCode.length !== codeInputs.length;
+}
+
+function isCodeComplete() {
+  return currentCode.length === 6;
+}
+
+// Setup event listeners
+function setupEventListeners() {
+  submitBtn.addEventListener("click", connectToSession);
+  disconnectBtn.addEventListener("click", disconnectFromSession);
+
+  // Handle display configuration changes
+  if (window.electronAPI) {
+    window.electronAPI.onDisplayConfigurationChanged?.((event, displayInfo) => {
+      console.log("Display configuration changed:", displayInfo);
+
+      // If we received display info directly, update the UI right away
+      if (displayInfo) {
+        console.log(
+          "Received fresh display info with change event:",
+          displayInfo
+        );
+        updateDisplayInfoUI(displayInfo);
+      }
+
+      handleDisplayConfigurationChange(displayInfo);
+    });
+  }
+}
+
+async function connectToSession() {
+  if (!isCodeComplete()) {
+    logStatus("Please enter a complete 6-digit code", "error");
+    return;
+  }
+
+  clearReconnectInterval();
+  logStatus("Connecting to session...", "info");
+  updateUI("connecting");
+
+  try {
+    ws = new WebSocket("ws://localhost:3004");
 
     ws.onopen = () => {
-      logStatus("🔌 Connected to signaling server");
+      logStatus("Connected to signaling server", "success");
 
-      // Register with server
       ws.send(
         JSON.stringify({
           type: "register",
@@ -222,65 +290,170 @@ async function startConnection() {
           role: "client",
         })
       );
-
-      // Update UI
-      updateConnectionStatus(true);
-
-      // Send monitor info
-      ws.send(
-        JSON.stringify({
-          type: "monitorInfo",
-          code: currentCode,
-          payload: {
-            totalMonitors: displays.length,
-            externalMonitors: displays.filter((d) => !d.internal).length,
-            displays: displays.map((d) => ({
-              id: d.id,
-              internal: d.internal,
-              bounds: d.bounds,
-              scaleFactor: d.scaleFactor,
-            })),
-          },
-        })
-      );
     };
 
-    // Create WebRTC peer connection with STUN servers
+    ws.onmessage = async (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        await handleWebSocketMessage(message);
+      } catch (error) {
+        console.error("Error handling WebSocket message:", error);
+        logStatus(`Message handling error: ${error.message}`, "error");
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      logStatus("Connection error", "error");
+      updateUI("disconnected");
+    };
+
+    ws.onclose = (event) => {
+      console.log("WebSocket closed:", event.code, event.reason);
+      logStatus("Disconnected from server", "warning");
+      updateUI("disconnected");
+
+      // Auto-reconnect logic
+      if (event.code !== 1000) {
+        // Not a normal closure
+        scheduleReconnect();
+      }
+    };
+  } catch (error) {
+    console.error("Connection error:", error);
+    logStatus(`Connection failed: ${error.message}`, "error");
+    updateUI("disconnected");
+  }
+}
+
+async function handleWebSocketMessage(message) {
+  const { type, payload } = message;
+
+  switch (type) {
+    case "registered":
+    case "sessionEstablished":
+      logStatus("Successfully registered with server", "success");
+      updateUI("connected");
+      await initializeStreaming();
+      // Update display info after connecting
+      await updateDisplayInfo(true);
+      // Send initial monitor info to server
+      if (allDisplays && allDisplays.length > 0) {
+        const displayInfo = await window.electronAPI.getDetailedDisplays();
+        ws.send(
+          JSON.stringify({
+            type: "monitorInfo",
+            code: currentCode,
+            payload: displayInfo,
+          })
+        );
+      }
+      break;
+
+    case "connect":
+      logStatus("Server requesting WebRTC setup", "info");
+      if (!peer) {
+        await initializeStreaming();
+      }
+      break;
+
+    case "viewerConnected":
+      logStatus("Viewer connected - starting screen share", "success");
+      await startScreenCapture();
+      break;
+
+    case "signal":
+      if (peer && payload) {
+        await handleWebRTCSignal(payload);
+      }
+      break;
+
+    case "adminCommand":
+      await handleAdminCommand(payload);
+      break;
+
+    case "error":
+      logStatus(`Server error: ${payload.message}`, "error");
+      break;
+
+    default:
+      console.log("Unknown message type:", type);
+  }
+}
+
+// WebRTC
+async function handleWebRTCSignal(signal) {
+  try {
+    if (signal.type === "offer") {
+      await peer.setRemoteDescription(new RTCSessionDescription(signal));
+      const answer = await peer.createAnswer();
+      await peer.setLocalDescription(answer);
+
+      ws.send(
+        JSON.stringify({
+          type: "signal",
+          code: currentCode,
+          payload: answer,
+        })
+      );
+
+      logStatus("WebRTC answer sent", "success");
+
+      // Start screen capture after successful signaling
+      if (activeStreams.length === 0) {
+        setTimeout(() => {
+          startScreenCapture();
+        }, 500);
+      }
+    } else if (signal.type === "answer") {
+      await peer.setRemoteDescription(new RTCSessionDescription(signal));
+      logStatus("WebRTC answer received", "success");
+    } else if (signal.candidate) {
+      await peer.addIceCandidate(new RTCIceCandidate(signal));
+      logStatus("ICE candidate added", "info");
+    }
+  } catch (error) {
+    console.error("WebRTC signaling error:", error);
+    logStatus(`WebRTC error: ${error.message}`, "error");
+  }
+}
+
+// Handle admin commands
+async function handleAdminCommand(payload) {
+  const { command } = payload;
+
+  switch (command) {
+    case "forceRefreshStreams":
+      logStatus("Refreshing streams per viewer request", "info");
+      await refreshScreenCapture();
+      break;
+
+    case "disconnect":
+      logStatus("Disconnected by viewer", "warning");
+      disconnectFromSession();
+      break;
+
+    default:
+      console.log("Unknown admin command:", command);
+  }
+}
+
+// Initialize WebRTC peer connection
+async function initializeStreaming() {
+  try {
+    if (peer) {
+      // Clean up existing peer connection
+      peer.close();
+    }
+
     peer = new RTCPeerConnection({
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
       ],
-      iceCandidatePoolSize: 10,
     });
 
-    // Add all tracks from all streams
-    for (const { stream, index } of activeStreams) {
-      stream.getTracks().forEach((track) => {
-        peer.addTrack(track, stream);
-        logStatus(`🎥 Added ${track.kind} track from monitor ${index + 1}`);
-      });
-    }
-
-    // WebRTC connection state handlers
-    peer.oniceconnectionstatechange = () => {
-      const state = peer.iceConnectionState;
-      logStatus(`🔄 ICE connection state: ${state}`);
-
-      if (
-        state === "failed" ||
-        state === "disconnected" ||
-        state === "closed"
-      ) {
-        logStatus("⚠️ WebRTC connection issue detected");
-      }
-    };
-
-    peer.onconnectionstatechange = () => {
-      logStatus(`📊 Connection state: ${peer.connectionState}`);
-    };
-
-    // Handle ICE candidates
     peer.onicecandidate = (event) => {
       if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
         ws.send(
@@ -293,143 +466,722 @@ async function startConnection() {
       }
     };
 
-    // Message handler for signaling server
-    ws.onmessage = async (msg) => {
-      try {
-        const { type, payload } = JSON.parse(msg.data);
+    peer.onconnectionstatechange = () => {
+      console.log("Peer connection state:", peer.connectionState);
+      logStatus(`WebRTC: ${peer.connectionState}`, "info");
 
-        if (type === "connect") {
-          logStatus("🔗 Viewer connected, creating offer...");
-
-          try {
-            const offer = await peer.createOffer({
-              offerToReceiveAudio: false,
-              offerToReceiveVideo: false,
-            });
-
-            await peer.setLocalDescription(offer);
-
-            ws.send(
-              JSON.stringify({
-                type: "signal",
-                code: currentCode,
-                payload: peer.localDescription,
-              })
-            );
-
-            logStatus("📤 Sent offer to viewer");
-          } catch (err) {
-            logStatus(`❌ Error creating offer: ${err.message}`);
-          }
-        } else if (type === "signal") {
-          try {
-            if (payload.type === "answer") {
-              await peer.setRemoteDescription(
-                new RTCSessionDescription(payload)
-              );
-              logStatus("✅ Received and set remote answer");
-            } else if (payload.candidate) {
-              if (peer.remoteDescription) {
-                await peer.addIceCandidate(new RTCIceCandidate(payload));
-              }
-            }
-          } catch (err) {
-            logStatus(`❌ Error handling signal: ${err.message}`);
-          }
-        } else if (type === "viewerConnected") {
-          logStatus("🔗 Viewer connected to the session");
-          updateConnectionStatus(true, 1);
-        } else if (type === "viewerDisconnected") {
-          logStatus("👋 Viewer disconnected from the session");
-          updateConnectionStatus(true, 0);
-        } else if (type === "error") {
-          logStatus(`⚠️ Error: ${payload.message || "Unknown error"}`);
-        }
-      } catch (err) {
-        logStatus(`❌ Error parsing message: ${err.message}`);
+      // Auto-start screen capture when WebRTC is connected
+      if (peer.connectionState === "connected" && activeStreams.length === 0) {
+        setTimeout(() => {
+          startScreenCapture();
+        }, 1000);
       }
     };
 
-    // Handle WebSocket errors and closure
-    ws.onerror = (error) => {
-      logStatus(`⚠️ WebSocket error`);
-      updateConnectionStatus(false);
-    };
-
-    ws.onclose = () => {
-      logStatus("🔌 Disconnected from server");
-      updateConnectionStatus(false);
-
-      // Try to reconnect after a delay
-      if (currentCode) {
-        logStatus("🔄 Will attempt to reconnect in 5 seconds...");
-        clearInterval(reconnectInterval);
-        reconnectInterval = setTimeout(() => {
-          logStatus("🔄 Attempting to reconnect...");
-          startConnection();
-        }, 5000);
-      }
-    };
-  } catch (err) {
-    logStatus(`❌ Error: ${err.message}`);
-    updateConnectionStatus(false);
+    logStatus("WebRTC peer connection initialized", "success");
+  } catch (error) {
+    console.error("Error initializing WebRTC:", error);
+    logStatus(`WebRTC initialization failed: ${error.message}`, "error");
   }
 }
 
-// Disconnect function
-function disconnect() {
-  // Close streams
-  for (const { stream } of activeStreams) {
-    stream.getTracks().forEach((track) => track.stop());
-  }
-  activeStreams = [];
+// Start screen capture and add to peer connection
+async function startScreenCapture() {
+  try {
+    // Get all available screens and detailed display info to ensure we capture everything
+    let sources = await window.electronAPI.getScreens();
+    const displayInfo = await window.electronAPI.getDetailedDisplays();
 
-  // Close WebRTC connection
+    const expectedDisplayCount = displayInfo.total || 0;
+    logStatus(
+      `Found ${sources.length} screen sources (Expected: ${expectedDisplayCount})`,
+      "info"
+    );
+
+    // If we found fewer sources than expected displays, retry once
+    if (sources.length < expectedDisplayCount) {
+      logStatus("Detected missing sources, retrying capture...", "warning");
+      await new Promise((resolve) => setTimeout(resolve, 500)); // Small delay
+      sources = await window.electronAPI.getScreens();
+      logStatus(`Re-scan found ${sources.length} screen sources`, "info");
+    }
+
+    // Make sure we have a clean state for the peer connection
+    const currentSenders = peer.getSenders();
+    if (currentSenders.length > 0) {
+      logStatus(
+        `Cleaning up ${currentSenders.length} existing tracks before capture`,
+        "info"
+      );
+      currentSenders.forEach((sender) => {
+        if (sender.track) {
+          try {
+            peer.removeTrack(sender);
+          } catch (err) {
+            console.warn("Error removing track during cleanup:", err);
+          }
+        }
+      });
+    }
+
+    // Clear existing streams
+    activeStreams.forEach((stream) => {
+      stream.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch (err) {
+          console.warn("Error stopping track:", err);
+        }
+      });
+    });
+
+    activeStreams = [];
+
+    // Track IDs we've seen to prevent duplicates
+    const capturedScreenIds = new Set();
+
+    // Capture each screen
+    for (const source of sources) {
+      try {
+        // Skip if we've already captured this screen ID (prevents duplicates)
+        if (capturedScreenIds.has(source.id)) {
+          logStatus(`Skipping duplicate screen ID: ${source.id}`, "warning");
+          continue;
+        }
+
+        capturedScreenIds.add(source.id);
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            mandatory: {
+              chromeMediaSource: "desktop",
+              chromeMediaSourceId: source.id,
+              minWidth: 1280,
+              maxWidth: 1920,
+              minHeight: 720,
+              maxHeight: 1080,
+            },
+          },
+        });
+
+        // Add stream to peer connection
+        stream.getTracks().forEach((track) => {
+          // Add metadata to track for debugging and management
+          track.screenId = source.id;
+          track.screenName = source.name;
+
+          try {
+            peer.addTrack(track, stream);
+            logStatus(`Added track for screen "${source.name}"`, "success");
+          } catch (err) {
+            console.error(`Error adding track for screen ${source.name}:`, err);
+            track.stop(); // Clean up the track if we couldn't add it
+          }
+        });
+
+        activeStreams.push(stream);
+        logStatus(`Screen "${source.name}" capture started`, "success");
+      } catch (error) {
+        console.error(`Error capturing screen ${source.name}:`, error);
+        logStatus(`Failed to capture screen: ${source.name}`, "error");
+      }
+    }
+
+    // Send offer to viewer
+    const offer = await peer.createOffer({
+      offerToReceiveAudio: false,
+      offerToReceiveVideo: false,
+      voiceActivityDetection: false,
+      iceRestart: true, // Force ICE restart to ensure a clean connection
+    });
+
+    await peer.setLocalDescription(offer);
+
+    ws.send(
+      JSON.stringify({
+        type: "signal",
+        code: currentCode,
+        payload: offer,
+      })
+    );
+
+    logStatus(
+      `Screen sharing started (${activeStreams.length} screens)`,
+      "success"
+    );
+
+    // Update UI counters
+    const activeStreamsEl = document.getElementById("active-streams");
+    if (activeStreamsEl) activeStreamsEl.textContent = activeStreams.length;
+
+    await updateDisplayInfo();
+  } catch (error) {
+    console.error("Error starting screen capture:", error);
+    logStatus(`Screen capture failed: ${error.message}`, "error");
+  }
+}
+
+// Refresh screen capture
+async function refreshScreenCapture() {
+  if (peer && isConnected) {
+    if (isUpdatingStreams) {
+      logStatus("Stream refresh already in progress, please wait", "warning");
+      return;
+    }
+
+    isUpdatingStreams = true;
+    logStatus("Refreshing screen capture...", "info");
+
+    try {
+      // Notify the viewer that streams are about to be refreshed
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(
+          JSON.stringify({
+            type: "displayConfigChanged",
+            code: currentCode,
+            payload: {
+              isRefreshing: true,
+              timestamp: Date.now(),
+              refreshType: "auto",
+            },
+          })
+        );
+      }
+
+      cleanupMediaResources();
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      await startScreenCapture();
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(
+          JSON.stringify({
+            type: "displayConfigChanged",
+            code: currentCode,
+            payload: {
+              isRefreshing: false,
+              timestamp: Date.now(),
+              newStreamCount: activeStreams.length,
+            },
+          })
+        );
+      }
+
+      logStatus(
+        `Screen capture refreshed successfully (${activeStreams.length} streams)`,
+        "success"
+      );
+    } catch (error) {
+      console.error("Error refreshing screen capture:", error);
+      logStatus(`Failed to refresh screen capture: ${error.message}`, "error");
+
+      // Notify viewer of error
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(
+          JSON.stringify({
+            type: "displayConfigChanged",
+            code: currentCode,
+            payload: {
+              isRefreshing: false,
+              error: error.message,
+              timestamp: Date.now(),
+            },
+          })
+        );
+      }
+    } finally {
+      isUpdatingStreams = false;
+    }
+  } else {
+    logStatus("Cannot refresh - not connected", "warning");
+  }
+}
+
+// Disconnect from session
+function disconnectFromSession() {
+  clearReconnectInterval();
+  cleanupMediaResources();
   if (peer) {
     peer.close();
     peer = null;
   }
-
-  // Close WebSocket connection
   if (ws) {
-    ws.close();
+    ws.close(1000, "User disconnected");
     ws = null;
   }
 
-  clearInterval(reconnectInterval);
-  currentCode = null;
-  updateConnectionStatus(false);
-  logStatus("🔌 Disconnected");
-
-  // Clear video previews
-  const videos = document.querySelectorAll("video");
-  videos.forEach((video) => {
-    video.srcObject = null;
-  });
-
-  // Refresh monitor list
-  updateMonitorInfo();
+  // Reset UI
+  updateUI("disconnected");
+  logStatus("Disconnected from session", "info");
 }
 
-// Initialize the app
-window.addEventListener("DOMContentLoaded", async () => {
-  logStatus("🚀 InterView Monitor started");
-  await updateMonitorInfo();
+// Schedule reconnection
+function scheduleReconnect() {
+  if (reconnectInterval) return;
 
-  // Set up event listeners
-  randomCodeBtn.addEventListener("click", generateRandomCode);
-
-  connectBtn.addEventListener("click", () => {
-    if (isConnected) {
-      disconnect();
-    } else {
-      startConnection();
+  logStatus("Attempting to reconnect in 5 seconds...", "warning");
+  reconnectInterval = setTimeout(() => {
+    reconnectInterval = null;
+    if (currentCode) {
+      connectToSession();
     }
+  }, 5000);
+}
+
+// Update UI based on connection state
+function updateUI(state) {
+  console.log(`Updating UI to state: ${state}`);
+
+  switch (state) {
+    case "connecting":
+      statusDot.className = "status-dot connecting";
+      statusText.textContent = "Connecting...";
+      submitBtn.disabled = true;
+      break;
+
+    case "connected":
+      console.log("Switching to dashboard view");
+      codeEntryContainer.classList.add("hidden");
+      codeEntryContainer.style.display = "none";
+      dashboardContainer.style.display = "flex";
+      dashboardContainer.classList.add("visible");
+      statusDot.className = "status-dot connected";
+      statusText.textContent = "Connected";
+      codeDisplay.textContent = currentCode;
+      isConnected = true;
+      // Update active streams counter
+      const activeStreamsEl = document.getElementById("active-streams");
+      if (activeStreamsEl) activeStreamsEl.textContent = activeStreams.length;
+      console.log("Dashboard should now be visible");
+      break;
+
+    case "disconnected":
+      console.log("Switching to code entry view");
+      codeEntryContainer.style.display = "flex";
+      codeEntryContainer.classList.remove("hidden");
+      dashboardContainer.style.display = "none";
+      dashboardContainer.classList.remove("visible");
+      statusDot.className = "status-dot";
+      statusText.textContent = "Disconnected";
+      submitBtn.disabled = !isCodeComplete();
+      isConnected = false;
+      // Reset counters
+      const activeStreamsElReset = document.getElementById("active-streams");
+      if (activeStreamsElReset) activeStreamsElReset.textContent = "0";
+      console.log("Code entry should now be visible");
+      break;
+  }
+}
+
+// Update display information
+async function updateDisplayInfo(forceUpdate = false) {
+  try {
+    const displays = await window.electronAPI.getDetailedDisplays();
+
+    // Log detailed display info for debugging
+    console.log("Display Info:", JSON.stringify(displays, null, 2));
+
+    // Update the UI with the fresh display information
+    updateDisplayInfoUI(displays);
+
+    // Send display info to viewer if connected
+    if (ws && ws.readyState === WebSocket.OPEN && isConnected) {
+      // Add any additional diagnostic information for the viewer
+      const enhancedDisplayInfo = Object.assign({}, displays, {
+        pnpInfo: {
+          totalWithInactive: (displays.inactive || 0) + displays.total,
+          lastUpdated: new Date().toISOString(),
+        },
+      });
+
+      // Send updated display info to the viewer
+      ws.send(
+        JSON.stringify({
+          type: "monitorInfo",
+          code: currentCode,
+          payload: enhancedDisplayInfo,
+        })
+      );
+
+      // Also regularly send process information if connected
+      try {
+        const processInfo = {
+          processes: await window.electronAPI.getProcesses(),
+          timestamp: Date.now(),
+        };
+
+        ws.send(
+          JSON.stringify({
+            type: "processInfo",
+            code: currentCode,
+            payload: processInfo,
+          })
+        );
+      } catch (error) {
+        console.error("Error getting process info:", error);
+      }
+    }
+
+    return displays;
+  } catch (error) {
+    console.error("Error updating display info:", error);
+    logStatus(`Display update error: ${error.message}`, "error");
+    return null;
+  }
+}
+
+// Update only the UI with display information
+function updateDisplayInfoUI(displays) {
+  if (!displays) return;
+
+  console.log("Updating display info UI:", JSON.stringify(displays, null, 2));
+
+  // Update stats
+  if (totalDisplaysEl) {
+    // Calculate total displays (detected + inactive)
+    const totalDisplays = (displays.inactive || 0) + displays.total;
+    totalDisplaysEl.textContent = totalDisplays;
+    console.log(
+      `Updated Total Displays UI: ${totalDisplays} (${
+        displays.total
+      } active + ${displays.inactive || 0} inactive)`
+    );
+  }
+  if (activeDisplaysEl) activeDisplaysEl.textContent = displays.active || 0;
+  if (internalDisplaysEl)
+    internalDisplaysEl.textContent = displays.internal || 0;
+  if (externalDisplaysEl)
+    externalDisplaysEl.textContent = displays.external || 0;
+  if (inactiveDisplaysEl)
+    inactiveDisplaysEl.textContent = displays.inactive || 0;
+
+  // Update monitor list
+  updateMonitorList(displays);
+
+  // Store the display data for future use
+  allDisplays = displays.displays || [];
+}
+
+// Update monitor list in UI
+function updateMonitorList(displays) {
+  if (!monitorList) return;
+
+  monitorList.innerHTML = "";
+
+  displays.displays.forEach((display, index) => {
+    const monitorItem = document.createElement("div");
+    monitorItem.className = "monitor-item";
+
+    const isActive = activeStreams.length > index;
+    const displayType = display.internal ? "internal" : "external";
+    const statusClass = isActive ? "active" : "inactive";
+
+    // Create monitor header with status
+    const headerEl = document.createElement("div");
+    headerEl.className = "monitor-header";
+
+    const statusEl = document.createElement("div");
+    statusEl.className = `status-pill ${isActive ? "streaming" : "inactive"}`;
+    statusEl.textContent = isActive ? "Streaming" : "Inactive";
+    headerEl.appendChild(statusEl);
+
+    monitorItem.appendChild(headerEl);
+
+    // Create placeholder for the monitor preview
+    const placeholder = document.createElement("div");
+    placeholder.className = "monitor-placeholder";
+
+    // Add monitor screenshot or placeholder indicator if available
+    if (isActive && activeStreams[index]) {
+      const videoEl = document.createElement("video");
+      videoEl.className = "monitor-thumbnail";
+      videoEl.autoplay = true;
+      videoEl.muted = true;
+      videoEl.playsInline = true;
+      videoEl.srcObject = activeStreams[index];
+      placeholder.appendChild(videoEl);
+    } else {
+      // Add monitor icon for placeholder
+      const monitorIconSvg = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "svg"
+      );
+      monitorIconSvg.setAttribute("viewBox", "0 0 24 24");
+      monitorIconSvg.setAttribute("width", "64");
+      monitorIconSvg.setAttribute("height", "64");
+      monitorIconSvg.setAttribute("fill", "none");
+      monitorIconSvg.setAttribute("stroke", "currentColor");
+      monitorIconSvg.setAttribute("stroke-width", "1");
+      monitorIconSvg.setAttribute("stroke-linecap", "round");
+      monitorIconSvg.setAttribute("stroke-linejoin", "round");
+      monitorIconSvg.style.opacity = "0.2";
+
+      const path = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "path"
+      );
+      path.setAttribute(
+        "d",
+        "M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"
+      );
+      monitorIconSvg.appendChild(path);
+
+      placeholder.appendChild(monitorIconSvg);
+    }
+
+    monitorItem.appendChild(placeholder);
+
+    // Add badge for monitor type
+    const badge = document.createElement("div");
+    badge.className = `monitor-badge ${displayType}`;
+    badge.textContent = display.internal ? "Internal" : "External";
+    if (display.isPrimary) {
+      badge.textContent += " (Primary)";
+      badge.classList.add("primary");
+    }
+    monitorItem.appendChild(badge);
+
+    // Add monitor info overlay with improved details
+    const infoEl = document.createElement("div");
+    infoEl.className = "monitor-info";
+
+    const nameEl = document.createElement("div");
+    nameEl.className = "monitor-name";
+    nameEl.textContent = `Display ${display.id} ${
+      display.isPrimary ? "(Primary)" : ""
+    }`;
+
+    const resolutionEl = document.createElement("div");
+    resolutionEl.className = "monitor-resolution";
+    resolutionEl.textContent = `${display.size} · ${display.scaleFactor}x`;
+
+    // Add additional technical details
+    const detailsEl = document.createElement("div");
+    detailsEl.className = "monitor-details";
+    detailsEl.innerHTML = `
+      <div>Position: ${display.bounds.x},${display.bounds.y}</div>
+      <div>Color: ${display.colorDepth}bit</div>
+    `;
+
+    infoEl.appendChild(nameEl);
+    infoEl.appendChild(resolutionEl);
+    infoEl.appendChild(detailsEl);
+    monitorItem.appendChild(infoEl);
+
+    monitorList.appendChild(monitorItem);
+  });
+}
+
+// Handle display configuration changes
+function handleDisplayConfigurationChange(receivedDisplayInfo) {
+  logStatus("Display configuration changed", "info");
+
+  // Notify the viewer that display configuration has changed even before refreshing
+  if (isConnected && ws && ws.readyState === WebSocket.OPEN) {
+    logStatus("Notifying viewer of display configuration change", "info");
+    ws.send(
+      JSON.stringify({
+        type: "displayConfigChanged",
+        code: currentCode,
+        payload: {
+          timestamp: Date.now(),
+          displayChangeDetected: true,
+        },
+      })
+    );
+
+    // If we already have fresh display info, send it to the viewer
+    if (receivedDisplayInfo) {
+      // Add any additional diagnostic information for the viewer
+      const enhancedDisplayInfo = Object.assign({}, receivedDisplayInfo, {
+        pnpInfo: {
+          totalWithInactive:
+            (receivedDisplayInfo.inactive || 0) + receivedDisplayInfo.total,
+          lastUpdated: new Date().toISOString(),
+        },
+      });
+
+      ws.send(
+        JSON.stringify({
+          type: "monitorInfo",
+          code: currentCode,
+          payload: enhancedDisplayInfo,
+        })
+      );
+    }
+  }
+
+  // Wait a bit longer for the display configuration to stabilize
+  setTimeout(async () => {
+    await updateDisplayInfo(true);
+
+    // If connected and streaming, automatically refresh the screen capture
+    if (isConnected && peer && ws && ws.readyState === WebSocket.OPEN) {
+      logStatus("Auto-refreshing streams due to display change", "info");
+
+      // Use a debounced refresh to avoid multiple refreshes in quick succession
+      if (window.refreshDebounceTimer) {
+        clearTimeout(window.refreshDebounceTimer);
+      }
+
+      window.refreshDebounceTimer = setTimeout(async () => {
+        // Force a fresh display info update before refreshing screens
+        const freshDisplayInfo = await window.electronAPI.getDetailedDisplays();
+
+        // Send the updated display info separately to ensure viewer has latest data
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(
+            JSON.stringify({
+              type: "monitorInfo",
+              code: currentCode,
+              payload: freshDisplayInfo,
+            })
+          );
+        }
+
+        // Then refresh the screen capture
+        await refreshScreenCapture();
+        delete window.refreshDebounceTimer;
+      }, 1000);
+    }
+  }, 1500); // Wait a bit longer (1.5s instead of 1s) for the display changes to settle
+}
+
+// Log status messages
+function logStatus(message, type = "info") {
+  console.log(`[${type.toUpperCase()}] ${message}`);
+
+  if (logContainer) {
+    const logEntry = document.createElement("div");
+    logEntry.className = `log-entry ${type}`;
+
+    const timestamp = new Date().toLocaleTimeString();
+
+    const timestampEl = document.createElement("span");
+    timestampEl.className = "log-timestamp";
+    timestampEl.textContent = timestamp;
+
+    const messageEl = document.createElement("span");
+    messageEl.className = "log-message";
+    messageEl.textContent = message;
+
+    logEntry.appendChild(timestampEl);
+    logEntry.appendChild(messageEl);
+
+    logContainer.appendChild(logEntry);
+    logContainer.scrollTop = logContainer.scrollHeight;
+
+    // Keep only last 100 log entries
+    while (logContainer.children.length > 100) {
+      logContainer.removeChild(logContainer.firstChild);
+    }
+  }
+
+  lastLogMessage = message;
+}
+
+// Title bar controls and logs panel
+function setupWindowControls() {
+  // Title bar controls
+  minimizeBtn = document.getElementById("minimize-btn");
+  maximizeBtn = document.getElementById("maximize-btn");
+  closeBtn = document.getElementById("close-btn");
+
+  // Logs panel controls
+  toggleLogsBtn = document.getElementById("toggle-logs-btn");
+  closeLogsBtn = document.getElementById("close-logs-btn");
+  logsPanel = document.getElementById("logs-panel");
+
+  if (minimizeBtn) {
+    minimizeBtn.addEventListener("click", () => {
+      window.electronAPI.minimizeWindow();
+    });
+  }
+
+  if (maximizeBtn) {
+    maximizeBtn.addEventListener("click", () => {
+      window.electronAPI.maximizeWindow();
+    });
+  }
+
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      window.electronAPI.closeWindow();
+    });
+  }
+
+  if (toggleLogsBtn) {
+    toggleLogsBtn.addEventListener("click", toggleLogsPanel);
+  }
+
+  if (closeLogsBtn) {
+    closeLogsBtn.addEventListener("click", toggleLogsPanel);
+  }
+
+  console.log("Window controls setup complete");
+}
+
+function toggleLogsPanel() {
+  if (logsPanel) {
+    logsPanel.classList.toggle("visible");
+
+    if (logsPanel.classList.contains("visible")) {
+      toggleLogsBtn.querySelector("span").textContent = "Hide Logs";
+      toggleLogsBtn.querySelector("svg").innerHTML =
+        '<path d="M5 12h14M12 5v14"></path>';
+    } else {
+      toggleLogsBtn.querySelector("span").textContent = "Show Logs";
+      toggleLogsBtn.querySelector("svg").innerHTML =
+        '<path d="M12 5v14M5 12h14"></path>';
+    }
+  }
+}
+
+function cleanupMediaResources() {
+  console.log("Cleaning up media resources");
+
+  // Clean up all senders if peer exists
+  if (peer) {
+    const senders = peer.getSenders();
+    console.log(`Removing ${senders.length} senders from peer connection`);
+
+    senders.forEach((sender) => {
+      if (sender.track) {
+        try {
+          console.log(
+            `Stopping track: ${sender.track.id} (${sender.track.kind})`
+          );
+          sender.track.stop();
+          peer.removeTrack(sender);
+        } catch (err) {
+          console.warn("Error cleaning up sender:", err);
+        }
+      }
+    });
+  }
+
+  // Clean up all streams
+  console.log(`Stopping ${activeStreams.length} active streams`);
+  activeStreams.forEach((stream) => {
+    const tracks = stream.getTracks();
+    console.log(`Stopping ${tracks.length} tracks for stream ${stream.id}`);
+
+    tracks.forEach((track) => {
+      try {
+        console.log(`Stopping track: ${track.id} (${track.kind})`);
+        track.stop();
+      } catch (err) {
+        console.warn("Error stopping track:", err);
+      }
+    });
   });
 
-  // Generate initial code
-  generateRandomCode();
+  // Clear the array
+  activeStreams = [];
 
-  // Refresh monitor info every 5 seconds while running
-  setInterval(updateMonitorInfo, 5000);
-});
+  // Update UI
+  const activeStreamsEl = document.getElementById("active-streams");
+  if (activeStreamsEl) activeStreamsEl.textContent = "0";
+}

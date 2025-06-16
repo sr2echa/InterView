@@ -50,7 +50,7 @@ interface MonitorInfoProps {
   processInfo: ProcessInfo | null;
   formattedRefreshDate: string;
   activeTab: "screens" | "processes";
-  setActiveTab: React.Dispatch<React.SetStateAction<"screens" | "processes">>;
+  setActiveTab?: React.Dispatch<React.SetStateAction<"screens" | "processes">>;
 }
 
 export default function MonitorInfo({
@@ -58,8 +58,8 @@ export default function MonitorInfo({
   processInfo,
   formattedRefreshDate,
   activeTab,
-  setActiveTab,
-}: MonitorInfoProps) {
+}: // setActiveTab,
+MonitorInfoProps) {
   return (
     <div className="bg-black h-full flex flex-col p-3 overflow-y-auto thin-scrollbar">
       <div className="text-xs text-zinc-400 mb-2 hidden md:block">

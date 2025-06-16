@@ -30,7 +30,7 @@ export default function ViewerPage() {
   const [generatedCode, setGeneratedCode] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState("");
-  const [isConnecting, setIsConnecting] = useState(false);
+  // const [isConnecting, setIsConnecting] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const router = useRouter();
@@ -148,7 +148,7 @@ export default function ViewerPage() {
   }; // Handle navigation to the monitoring page
   const connectWithGeneratedCode = () => {
     if (generatedCode) {
-      setIsConnecting(true);
+      // setIsConnecting(true);
       router.push(`/viewer/${generatedCode}`);
     }
   };

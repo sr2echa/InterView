@@ -34,6 +34,7 @@ export default function HomePage() {
 
     // Random code animation
     const interval = setInterval(() => {
+      console.log(animateCode);
       setAnimateCode((prev) => !prev);
     }, 3000);
 

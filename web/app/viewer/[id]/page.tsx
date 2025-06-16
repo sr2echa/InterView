@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
-import MonitorInfo from "@/components/monitor/monitor-info";
+import MonitorInfo from "@/components/monitor-info";
 
 type ProcessInfo = {
   timestamp: number;

@@ -4,15 +4,20 @@
 Monitor technical interviews in real-time with secure screen sharing and comprehensive system insights. Secure Remote Interview Monitoring. Done Right.
 
 ## The plan
+
 Make the client into a npm pkg. So interviewers can just ask them to install the npm pkg like `npm i -g InterView` and run `InterView` to open up the client eliminating the need to "install 3rd party software". Monitoring is via the web to make sure it is easy for the interviewer to monitor
 
 ## Features
+
 - Detect and monitor all monitors (even get number of monitors that are active, inactive)
 - See what the client sees in realtime across all streams
 - Remote disconnect sessions
-- See all background processes running 
+- See background processes running in realtime
+- Silent (no additional permissions required)
+- Seamlessly detect display changes, and update realtime
 
 ## Bunch of screenshots
+
 Will post a video demo soon
 
 #### Web
@@ -38,24 +43,27 @@ Will post a video demo soon
   </tr>
 </table>
 
-
-
 ## ToDo
+
 - Code Refactoring
 - Switch to env for Backend WebSocket URL
 - Enhance the Process Page.
-    - Add active tabs and known apps running in the background
-    - Detect Keystrokes
-    - Remote kill processes (with precautions ofc)
+  - Add active tabs and known apps running in the background
+  - Detect Keystrokes
+  - Remote kill processes (with precautions ofc)
 - Make the client into npm pkg
 - Optimize WebRTC implimentation
 - Check if screen is being mirrored or duplicated (requieres a C++/C# implimentation to access system level info of DisplaySwitch.exe's current state)
-- Test across other platforms 
+- Test across other platforms
 
 ## The Codebase
+
 `client` - Electron APP for interviewee <br>
 `server` - websocket server to handle connectins and streaming <br>
 `web` - web dashboard in Nextjs + Typescript for the Interviewer to monitor <br>
 
+## Docs
+
+soon...
 
 </samp>

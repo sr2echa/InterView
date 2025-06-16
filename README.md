@@ -42,6 +42,7 @@ Will post a video demo soon
     - Detect Keystrokes
     - Remote kill processes (with precautions ofc)
 - Make the client into npm pkg
+- Optimize WebRTC implimentation 
 
 ## The Codebase
 `client` - Electron APP for interviewee <br>

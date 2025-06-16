@@ -1,7 +1,3 @@
-"use client";
-
-import { useState } from "react";
-
 type MonitorInfo = {
   total: number;
   primary: number | null;

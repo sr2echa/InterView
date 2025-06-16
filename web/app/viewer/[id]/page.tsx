@@ -52,6 +52,14 @@ type MonitorInfo = {
   }>;
 };
 
+type Payload = {
+  isRefreshing?: boolean;
+  refreshType?: string;
+  displayChangeDetected?: boolean;
+  error?: string;
+  newStreamCount?: number;
+};
+
 export default function ViewerIdPage() {
   const params = useParams();
   const code = params.id as string;
@@ -61,7 +69,7 @@ export default function ViewerIdPage() {
   const copiedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
-  const [serverAddress, setServerAddress] = useState("ws://localhost:3004");
+  const [serverAddress] = useState("ws://localhost:3004");
   // State
   const [status, setStatus] = useState("Initializing...");
   const [streams, setStreams] = useState<MediaStream[]>([]);
@@ -113,7 +121,6 @@ export default function ViewerIdPage() {
     function setupConnection() {
       setStatus("Connecting to signaling server...");
       socket = new WebSocket(serverAddress);
-      // Ensure trailing slash removal
       socket = new WebSocket(serverAddress.replace(/\/$/, ""));
       socketRef.current = socket;
 
@@ -124,7 +131,7 @@ export default function ViewerIdPage() {
         socket!.send(
           JSON.stringify({ type: "register", code, role: "viewer" })
         );
-        // Wait a bit before sending connect to ensure registration is processed
+
         setTimeout(() => {
           if (socket && socket.readyState === WebSocket.OPEN) {
             console.log("Sending connect request for code:", code);
@@ -383,7 +390,6 @@ export default function ViewerIdPage() {
     });
   }, [lastRefresh]);
 
-  // Handle ESC key press to close modal
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && expandedStream) {
@@ -472,8 +478,7 @@ export default function ViewerIdPage() {
     }
   };
 
-  // Handle display configuration changes
-  const handleDisplayConfigChange = (payload: any) => {
+  const handleDisplayConfigChange = (payload: Payload) => {
     if (payload?.isRefreshing) {
       setIsRefreshing(true);
 
@@ -531,10 +536,9 @@ export default function ViewerIdPage() {
       } else {
         const streamCount = payload?.newStreamCount || 0;
         setStatus(`Stream refresh completed (${streamCount} streams)`);
-        setErrorMessage(""); // Clear any previous errors
+        setErrorMessage("");
         setLastRefresh(new Date());
 
-        // Clean up any stale streams after a short delay
         setTimeout(() => {
           setStreams((prevStreams) => {
             // Filter out streams with inactive tracks
@@ -568,109 +572,109 @@ export default function ViewerIdPage() {
     }
   };
 
-  const renderProcessesContent = () => {
-    if (
-      !processInfo ||
-      !processInfo.processes ||
-      processInfo.processes.length === 0
-    ) {
-      return (
-        <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="48"
-            height="48"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="mb-3 opacity-50"
-          >
-            <path d="M18 6a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v12a4 4 0 0 0 4 4h8a4 4 0 0 0 4-4z" />
-            <circle cx="12" cy="10" r="3" />
-            <path d="M12 16v6" />
-          </svg>
-          <p>No process information available</p>
-          <p className="text-sm mt-2">
-            This will appear once the connection is established
-          </p>
-        </div>
-      );
-    }
+  // const renderProcessesContent = () => {
+  //   if (
+  //     !processInfo ||
+  //     !processInfo.processes ||
+  //     processInfo.processes.length === 0
+  //   ) {
+  //     return (
+  //       <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+  //         <svg
+  //           xmlns="http://www.w3.org/2000/svg"
+  //           width="48"
+  //           height="48"
+  //           viewBox="0 0 24 24"
+  //           fill="none"
+  //           stroke="currentColor"
+  //           strokeWidth="1.5"
+  //           strokeLinecap="round"
+  //           strokeLinejoin="round"
+  //           className="mb-3 opacity-50"
+  //         >
+  //           <path d="M18 6a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v12a4 4 0 0 0 4 4h8a4 4 0 0 0 4-4z" />
+  //           <circle cx="12" cy="10" r="3" />
+  //           <path d="M12 16v6" />
+  //         </svg>
+  //         <p>No process information available</p>
+  //         <p className="text-sm mt-2">
+  //           This will appear once the connection is established
+  //         </p>
+  //       </div>
+  //     );
+  //   }
 
-    return (
-      <div className="overflow-hidden rounded-lg border border-zinc-800/30 shadow-lg">
-        <div className="bg-zinc-900/40 px-4 py-3 flex items-center justify-between border-b border-zinc-800/30">
-          <div className="flex items-center">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="mr-2 text-blue-500"
-            >
-              <rect x="2" y="4" width="20" height="16" rx="2" />
-              <rect x="6" y="8" width="8" height="8" rx="1" />
-              <path d="M18 8v8" />
-            </svg>
-            <span className="font-medium">Running Processes</span>
-          </div>
-          <div className="text-xs text-gray-400">
-            Last updated: {formattedRefreshDate}
-          </div>
-        </div>
-        <div className="overflow-auto max-h-96">
-          <table className="w-full text-sm">
-            <thead>
-              {" "}
-              <tr className="bg-zinc-950/80 text-zinc-400 text-xs uppercase">
-                <th className="px-4 py-2 text-left font-medium">Process</th>
-                <th className="px-4 py-2 text-left font-medium">PID</th>
-                <th className="px-4 py-2 text-right font-medium">
-                  Memory (MB)
-                </th>
-                <th className="px-4 py-2 text-right font-medium">CPU %</th>
-                <th className="px-4 py-2 text-left font-medium">
-                  Window Title
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {processInfo.processes.slice(0, 100).map((proc) => (
-                <tr
-                  key={`${proc.Id}-${proc.ProcessName}`}
-                  className="border-t border-zinc-800/20 hover:bg-zinc-900/40 transition-colors"
-                >
-                  <td className="px-4 py-2 text-white font-mono">
-                    {proc.ProcessName}
-                  </td>
-                  <td className="px-4 py-2 text-gray-400 font-mono">
-                    {proc.Id}
-                  </td>
-                  <td className="px-4 py-2 text-right text-blue-400 font-mono">
-                    {proc.Memory ? proc.Memory.toFixed(1) : "N/A"}
-                  </td>
-                  <td className="px-4 py-2 text-right text-green-400 font-mono">
-                    {proc.CPU ? proc.CPU.toFixed(1) : "N/A"}
-                  </td>
-                  <td className="px-4 py-2 text-gray-300 font-mono truncate max-w-[300px]">
-                    {proc.WindowTitle || ""}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  };
+  //   return (
+  //     <div className="overflow-hidden rounded-lg border border-zinc-800/30 shadow-lg">
+  //       <div className="bg-zinc-900/40 px-4 py-3 flex items-center justify-between border-b border-zinc-800/30">
+  //         <div className="flex items-center">
+  //           <svg
+  //             xmlns="http://www.w3.org/2000/svg"
+  //             width="16"
+  //             height="16"
+  //             viewBox="0 0 24 24"
+  //             fill="none"
+  //             stroke="currentColor"
+  //             strokeWidth="1.5"
+  //             strokeLinecap="round"
+  //             strokeLinejoin="round"
+  //             className="mr-2 text-blue-500"
+  //           >
+  //             <rect x="2" y="4" width="20" height="16" rx="2" />
+  //             <rect x="6" y="8" width="8" height="8" rx="1" />
+  //             <path d="M18 8v8" />
+  //           </svg>
+  //           <span className="font-medium">Running Processes</span>
+  //         </div>
+  //         <div className="text-xs text-gray-400">
+  //           Last updated: {formattedRefreshDate}
+  //         </div>
+  //       </div>
+  //       <div className="overflow-auto max-h-96">
+  //         <table className="w-full text-sm">
+  //           <thead>
+  //             {" "}
+  //             <tr className="bg-zinc-950/80 text-zinc-400 text-xs uppercase">
+  //               <th className="px-4 py-2 text-left font-medium">Process</th>
+  //               <th className="px-4 py-2 text-left font-medium">PID</th>
+  //               <th className="px-4 py-2 text-right font-medium">
+  //                 Memory (MB)
+  //               </th>
+  //               <th className="px-4 py-2 text-right font-medium">CPU %</th>
+  //               <th className="px-4 py-2 text-left font-medium">
+  //                 Window Title
+  //               </th>
+  //             </tr>
+  //           </thead>
+  //           <tbody>
+  //             {processInfo.processes.slice(0, 100).map((proc) => (
+  //               <tr
+  //                 key={`${proc.Id}-${proc.ProcessName}`}
+  //                 className="border-t border-zinc-800/20 hover:bg-zinc-900/40 transition-colors"
+  //               >
+  //                 <td className="px-4 py-2 text-white font-mono">
+  //                   {proc.ProcessName}
+  //                 </td>
+  //                 <td className="px-4 py-2 text-gray-400 font-mono">
+  //                   {proc.Id}
+  //                 </td>
+  //                 <td className="px-4 py-2 text-right text-blue-400 font-mono">
+  //                   {proc.Memory ? proc.Memory.toFixed(1) : "N/A"}
+  //                 </td>
+  //                 <td className="px-4 py-2 text-right text-green-400 font-mono">
+  //                   {proc.CPU ? proc.CPU.toFixed(1) : "N/A"}
+  //                 </td>
+  //                 <td className="px-4 py-2 text-gray-300 font-mono truncate max-w-[300px]">
+  //                   {proc.WindowTitle || ""}
+  //                 </td>
+  //               </tr>
+  //             ))}
+  //           </tbody>
+  //         </table>
+  //       </div>
+  //     </div>
+  //   );
+  // };
 
   return (
     <main className="relative min-h-screen bg-black text-white">
@@ -752,7 +756,7 @@ export default function ViewerIdPage() {
                       Stream ID: {expandedStream.stream.id.slice(-12)}
                     </span>
                   </div>
-                  <div className="text-xs md:text-sm text-zinc-400 mt-1 md:mt-0">
+                  <div className="text-xs md:text-sm text-zinc-400/50 mt-1 md:mt-0">
                     Press ESC or click outside to close
                   </div>
                 </div>
@@ -1024,7 +1028,7 @@ export default function ViewerIdPage() {
             )}
           </div>
 
-          {/* Left Sidebar for Monitor Info (Desktop only) */}
+          {/* Left Sidebar for Monitor Info (Desktop) */}
           <div className="hidden md:block md:w-72 shrink-0 overflow-y-auto border-r border-zinc-800/30">
             <div className="h-full">
               <MonitorInfo

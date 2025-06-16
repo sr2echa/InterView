@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import Image from "next/image";
 import {
   ArrowRight,
@@ -13,8 +12,8 @@ import {
   Lock,
   Code,
   MousePointer,
-  Maximize2,
-  X,
+  // Maximize2,
+  // X,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import Preview from "@/components/preview";

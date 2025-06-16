@@ -60,6 +60,9 @@ type Payload = {
   newStreamCount?: number;
 };
 
+const serverAddress =
+  process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://localhost:3004";
+
 export default function ViewerIdPage() {
   const params = useParams();
   const code = params.id as string;
@@ -69,7 +72,6 @@ export default function ViewerIdPage() {
   const copiedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
-  const [serverAddress] = useState("ws://localhost:3004");
   // State
   const [status, setStatus] = useState("Initializing...");
   const [streams, setStreams] = useState<MediaStream[]>([]);

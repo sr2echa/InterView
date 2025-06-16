@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 
-const serverUrl = "ws://localhost:3004";
+const serverUrl = process.env.NEXT_PUBLIC_API_URL || "ws://localhost:3004";
 
 export default function ViewerPage() {
   const [generatedCode, setGeneratedCode] = useState("");

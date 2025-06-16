@@ -80,7 +80,7 @@ async function getWindowsProcessList() {
 
 // --- SIMPLE CLIENT-VIEWER SESSION MODEL ---
 
-const wss = new WebSocketServer({ port: 3004 });
+const wss = new WebSocketServer({ port: process.env.PORT || 3004 });
 // Map: code => { client: ws, viewer: ws, info: {} }
 const sessions = new Map();
 const activeCodes = new Set();
@@ -687,4 +687,6 @@ wss.on("close", () => {
   console.log("🔌 WebSocket server closing");
 });
 
-console.log("🚀 Signaling server running at ws://localhost:3004");
+console.log(
+  `🚀 Signaling server running at ws://localhost:${process.env.PORT}`
+);

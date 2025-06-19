@@ -278,7 +278,7 @@ async function connectToSession() {
   updateUI("connecting");
 
   try {
-    ws = new WebSocket(process.env.WEBSOCKET_URL || "ws://localhost:3004");
+    ws = new WebSocket("ws://localhost:3004");
 
     ws.onopen = () => {
       logStatus("Connected to signaling server", "success");

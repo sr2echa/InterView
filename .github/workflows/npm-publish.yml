@@ -35,6 +35,11 @@ jobs:
           cd client
           pnpm test --if-present
 
+      - name: Test package creation
+        run: |
+          cd client
+          npm pack
+
       - name: Publish to NPM
         run: |
           cd client

@@ -1,11 +1,11 @@
 <samp>
   
-# InterView
+# Interwu
 Monitor technical interviews in real-time with secure screen sharing and comprehensive system insights. Secure Remote Interview Monitoring. Done Right.
 
 ## The plan
 
-Make the client into a npm pkg. So interviewers can just ask them to install the npm pkg like `npm i -g InterView` and run `InterView` to open up the client eliminating the need to "install 3rd party software". Monitoring is via the web to make sure it is easy for the interviewer to monitor
+Make the client into a npm pkg. So interviewers can just ask them to install the npm pkg like `npm i -g interwu` and run `interwu` to open up the client eliminating the need to "install 3rd party software". Monitoring is via the web to make sure it is easy for the interviewer to monitor
 
 ## Features
 

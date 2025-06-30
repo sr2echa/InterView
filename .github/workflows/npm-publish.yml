@@ -20,15 +20,20 @@ jobs:
           node-version: "18"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
       - name: Install dependencies
         run: |
           cd client
-          npm ci
+          pnpm install
 
       - name: Run tests (if any)
         run: |
           cd client
-          npm test --if-present
+          pnpm test --if-present
 
       - name: Publish to NPM
         run: |

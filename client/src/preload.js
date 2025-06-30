@@ -1,5 +1,16 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+// Get configuration from command line arguments
+const args = process.argv;
+const isProduction =
+  args.find((arg) => arg.startsWith("--is-production="))?.split("=")[1] ===
+  "true";
+const sessionCode =
+  args.find((arg) => arg.startsWith("--session-code="))?.split("=")[1] || "";
+
+// Determine if we're in direct join mode (session code is provided)
+const isDirectJoin = !!sessionCode;
+
 contextBridge.exposeInMainWorld("electronAPI", {
   getScreens: () => ipcRenderer.invoke("get-sources"),
   getDisplays: () => ipcRenderer.invoke("get-displays"),
@@ -19,4 +30,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
   removeDisplayChangeListener: () => {
     ipcRenderer.removeAllListeners("display-configuration-changed");
   },
+});
+
+// Expose configuration globally for the renderer
+contextBridge.exposeInMainWorld("config", {
+  isProduction,
+  sessionCode,
+  isDirectJoin, // Indicates if we should skip code entry and join directly
+});
+
+// Expose method to notify main process of session disconnect
+contextBridge.exposeInMainWorld("notifySessionDisconnect", () => {
+  ipcRenderer.send("session-disconnected");
 });

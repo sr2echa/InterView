@@ -1,23 +1,52 @@
 {
-  "name": "client",
-  "productName": "client",
+  "name": "interwu",
+  "productName": "Interwu",
   "version": "1.0.0",
-  "description": "My Electron application description",
+  "description": "Client for Secure Remote Interview Monitoring.",
   "main": "src/index.js",
+  "bin": {
+    "interwu": "./bin/interwu.js"
+  },
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "lint": "echo \"No linting configured\""
+    "lint": "echo \"No linting configured\"",
+    "prepack": "echo \"Preparing package for npm...\""
   },
-  "keywords": [],
+  "keywords": [
+    "electron",
+    "screen-sharing",
+    "interview",
+    "cli",
+    "remote-desktop"
+  ],
   "author": {
     "name": "sr2echa",
     "email": "65058816+sr2echa@users.noreply.github.com"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sr2echa/InterView.git",
+    "directory": "client"
+  },
+  "homepage": "https://github.com/sr2echa/InterView",
+  "bugs": {
+    "url": "https://github.com/sr2echa/InterView/issues"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "os": [
+    "darwin",
+    "win32",
+    "linux"
+  ],
   "dependencies": {
+    "dotenv": "^17.0.0",
+    "electron": "^37.1.0",
     "electron-squirrel-startup": "^1.0.1"
   },
   "devDependencies": {
@@ -28,7 +57,6 @@
     "@electron-forge/maker-zip": "^7.8.1",
     "@electron-forge/plugin-auto-unpack-natives": "^7.8.1",
     "@electron-forge/plugin-fuses": "^7.8.1",
-    "@electron/fuses": "^1.8.0",
-    "electron": "36.4.0"
+    "@electron/fuses": "^1.8.0"
   }
 }

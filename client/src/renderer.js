@@ -11,6 +11,18 @@ let isUpdatingStreams = false;
 let lastLogMessage = "";
 let connectionTimeoutId = null;
 
+// Configuration object - will be initialized when DOM is ready
+let appConfig = {
+  isProduction: false,
+  sessionCode: "",
+  isDirectJoin: false, // Direct join mode enables automatic behaviors
+};
+
+// WebSocket URL based on production mode
+function getWebSocketURL() {
+  return appConfig.isProduction ? "ws://ws.interwu.xyz" : "ws://localhost:3004";
+}
+
 // UI elements - will be initialized when DOM is ready
 let codeEntryContainer;
 let dashboardContainer;
@@ -45,6 +57,14 @@ document.addEventListener("DOMContentLoaded", initializeApp);
 
 function initializeApp() {
   console.log("Initializing app...");
+
+  // Get configuration from global config object exposed by preload script
+  if (window.config) {
+    appConfig = window.config;
+    console.log("Configuration loaded:", appConfig);
+  } else {
+    console.warn("No configuration found, using defaults");
+  }
 
   // Initialize UI elements
   codeEntryContainer = document.getElementById("code-entry-container");
@@ -85,18 +105,40 @@ function initializeApp() {
   // New stat elements
   // totalDisplaysEl is set earlier  inactiveDisplaysEl = document.getElementById("inactive-displays");
 
-  // Ensure the code entry screen is visible initially
-  if (codeEntryContainer) {
-    codeEntryContainer.style.display = "flex";
-    codeEntryContainer.classList.remove("hidden");
-    console.log("Code entry container made visible");
-  }
+  // Handle direct join mode
+  if (appConfig.sessionCode && appConfig.sessionCode.length === 6) {
+    console.log("Direct join mode detected, skipping code entry screen");
+    currentCode = appConfig.sessionCode;
 
-  // Ensure the dashboard is hidden initially
-  if (dashboardContainer) {
-    dashboardContainer.style.display = "none";
-    dashboardContainer.classList.remove("visible");
-    console.log("Dashboard container hidden");
+    // Hide code entry and show dashboard immediately
+    if (codeEntryContainer) {
+      codeEntryContainer.style.display = "none";
+      codeEntryContainer.classList.add("hidden");
+    }
+
+    if (dashboardContainer) {
+      dashboardContainer.style.display = "flex";
+      dashboardContainer.classList.add("visible");
+    }
+
+    // Auto-connect after setup
+    setTimeout(() => {
+      connectToSession();
+    }, 1000);
+  } else {
+    // Normal mode - show code entry screen
+    if (codeEntryContainer) {
+      codeEntryContainer.style.display = "flex";
+      codeEntryContainer.classList.remove("hidden");
+      console.log("Code entry container made visible");
+    }
+
+    // Ensure the dashboard is hidden initially
+    if (dashboardContainer) {
+      dashboardContainer.style.display = "none";
+      dashboardContainer.classList.remove("visible");
+      console.log("Dashboard container hidden");
+    }
   }
 
   setupCodeInputs();
@@ -278,16 +320,27 @@ async function connectToSession() {
   updateUI("connecting");
 
   try {
-    ws = new WebSocket("ws://localhost:3004");
+    ws = new WebSocket(getWebSocketURL());
 
-    ws.onopen = () => {
+    ws.onopen = async () => {
       logStatus("Connected to signaling server", "success");
+
+      // Get display info to send with registration
+      const displayInfo = await window.electronAPI.getDetailedDisplays();
 
       ws.send(
         JSON.stringify({
           type: "register",
           code: currentCode,
           role: "client",
+          payload: {
+            clientInfo: {
+              timestamp: Date.now(),
+              displayInfo: displayInfo,
+              userAgent: navigator.userAgent,
+              platform: navigator.platform,
+            },
+          },
         })
       );
     };
@@ -333,6 +386,7 @@ async function handleWebSocketMessage(message) {
     case "registered":
     case "sessionEstablished":
       logStatus("Successfully registered with server", "success");
+      isConnected = true;
       updateUI("connected");
       await initializeStreaming();
       // Update display info after connecting
@@ -348,6 +402,7 @@ async function handleWebSocketMessage(message) {
           })
         );
       }
+      // Don't start screen capture yet - wait for viewer to connect
       break;
 
     case "connect":
@@ -355,6 +410,8 @@ async function handleWebSocketMessage(message) {
       if (!peer) {
         await initializeStreaming();
       }
+      // Start screen capture when connect is requested
+      await startScreenCapture();
       break;
 
     case "viewerConnected":
@@ -384,7 +441,20 @@ async function handleWebSocketMessage(message) {
 // WebRTC
 async function handleWebRTCSignal(signal) {
   try {
-    if (signal.type === "offer") {
+    if (signal.type === "answer") {
+      // Viewer is responding to our offer
+      await peer.setRemoteDescription(new RTCSessionDescription(signal));
+      logStatus("WebRTC answer received from viewer", "success");
+    } else if (signal.candidate) {
+      // Handle ICE candidates from viewer
+      await peer.addIceCandidate(new RTCIceCandidate(signal));
+      logStatus("ICE candidate added", "info");
+    } else if (signal.type === "offer") {
+      // This shouldn't happen in our flow, but handle gracefully
+      logStatus(
+        "Unexpected offer received - client should send offers",
+        "warning"
+      );
       await peer.setRemoteDescription(new RTCSessionDescription(signal));
       const answer = await peer.createAnswer();
       await peer.setLocalDescription(answer);
@@ -396,21 +466,8 @@ async function handleWebRTCSignal(signal) {
           payload: answer,
         })
       );
-
-      logStatus("WebRTC answer sent", "success");
-
-      // Start screen capture after successful signaling
-      if (activeStreams.length === 0) {
-        setTimeout(() => {
-          startScreenCapture();
-        }, 500);
-      }
-    } else if (signal.type === "answer") {
-      await peer.setRemoteDescription(new RTCSessionDescription(signal));
-      logStatus("WebRTC answer received", "success");
-    } else if (signal.candidate) {
-      await peer.addIceCandidate(new RTCIceCandidate(signal));
-      logStatus("ICE candidate added", "info");
+    } else {
+      console.log("Unknown signal type:", signal.type);
     }
   } catch (error) {
     console.error("WebRTC signaling error:", error);
@@ -470,11 +527,12 @@ async function initializeStreaming() {
       console.log("Peer connection state:", peer.connectionState);
       logStatus(`WebRTC: ${peer.connectionState}`, "info");
 
-      // Auto-start screen capture when WebRTC is connected
-      if (peer.connectionState === "connected" && activeStreams.length === 0) {
-        setTimeout(() => {
-          startScreenCapture();
-        }, 1000);
+      if (peer.connectionState === "connected") {
+        logStatus("WebRTC connection established successfully", "success");
+      } else if (peer.connectionState === "failed") {
+        logStatus("WebRTC connection failed", "error");
+      } else if (peer.connectionState === "disconnected") {
+        logStatus("WebRTC connection disconnected", "warning");
       }
     };
 
@@ -703,6 +761,7 @@ async function refreshScreenCapture() {
 function disconnectFromSession() {
   clearReconnectInterval();
   cleanupMediaResources();
+  isConnected = false;
   if (peer) {
     peer.close();
     peer = null;
@@ -715,6 +774,11 @@ function disconnectFromSession() {
   // Reset UI
   updateUI("disconnected");
   logStatus("Disconnected from session", "info");
+
+  // Handle automatic close for direct join mode (automatically close when session disconnects)
+  if (appConfig.isDirectJoin && window.notifySessionDisconnect) {
+    window.notifySessionDisconnect();
+  }
 }
 
 // Schedule reconnection

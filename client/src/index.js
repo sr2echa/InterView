@@ -6,14 +6,30 @@ const {
   screen,
 } = require("electron");
 const path = require("path");
+const fs = require("fs");
 const { execFile } = require("child_process");
 const {
   getDetailedDisplayInfo,
   setupDisplayMonitoring,
 } = require("./displayUtils");
 
+// Load environment variables from .env file if it exists
+const envPath = path.join(__dirname, "..", ".env");
+if (fs.existsSync(envPath)) {
+  require("dotenv").config({ path: envPath });
+}
+
 let previousDisplayConfig = [];
 let mainWindow;
+
+// Parse command line arguments for direct join usage
+const args = process.argv.slice(2);
+const sessionCodeArg = args.find((arg) => arg.startsWith("--session-code="));
+const sessionCode = sessionCodeArg ? sessionCodeArg.split("=")[1] : null;
+const isDirectJoin = !!sessionCode; // If session code is provided, we're in direct join mode
+
+// Environment variables
+const IS_PRODUCTION = process.env.IS_PRODUCTION === "true";
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -24,6 +40,10 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      additionalArguments: [
+        `--is-production=${IS_PRODUCTION}`,
+        `--session-code=${sessionCode || ""}`,
+      ],
     },
     autoHideMenuBar: true,
     frame: false,
@@ -39,6 +59,15 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, "index.html"));
 
   setupDisplayMonitoring(mainWindow);
+
+  // Handle automatic close on disconnect for direct join mode
+  if (isDirectJoin) {
+    mainWindow.webContents.on("ipc-message", (event, channel, ...args) => {
+      if (channel === "session-disconnected") {
+        app.quit();
+      }
+    });
+  }
 }
 
 app.whenReady().then(() => {
@@ -261,5 +290,13 @@ ipcMain.on("window-maximize", () => {
 ipcMain.on("window-close", () => {
   if (mainWindow) {
     mainWindow.close();
+  }
+});
+
+// Handle session disconnect for automatic close functionality
+ipcMain.on("session-disconnected", () => {
+  if (isDirectJoin) {
+    console.log("Session disconnected, closing app due to direct join mode");
+    app.quit();
   }
 });

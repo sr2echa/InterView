@@ -12,36 +12,24 @@ const LOG_STYLES = {
   SUB_BULLET: "- ",
 };
 
-/**
- * Debug logging utility - only logs when not in production
- * Uses clean ASCII formatting for better terminal compatibility
- */
 function debugLog(...args) {
-  if (process.env.IS_PRODUCTION !== "true") {
+  if (process.env.IS_PRODUCTION === "false") {
     const timestamp = new Date().toISOString().split("T")[1].slice(0, -1);
-    console.log(`[${timestamp}] [DISPLAY]`, ...args);
+    console.log(...args);
   }
 }
 
-/**
- * Debug error logging utility - only logs when not in production
- * Uses clean ASCII formatting for better terminal compatibility
- */
 function debugError(...args) {
-  if (process.env.IS_PRODUCTION !== "true") {
+  if (process.env.IS_PRODUCTION === "false") {
     const timestamp = new Date().toISOString().split("T")[1].slice(0, -1);
-    console.error(`[${timestamp}] [ERROR]`, ...args);
+    console.error(...args);
   }
 }
 
-/**
- * Debug warning logging utility - only logs when not in production
- * Uses clean ASCII formatting for better terminal compatibility
- */
 function debugWarn(...args) {
-  if (process.env.IS_PRODUCTION !== "true") {
+  if (process.env.IS_PRODUCTION === "false") {
     const timestamp = new Date().toISOString().split("T")[1].slice(0, -1);
-    console.warn(`[${timestamp}] [WARNING]`, ...args);
+    console.warn(...args);
   }
 }
 
@@ -293,7 +281,7 @@ async function getDetailedDisplayInfo() {
                 }
               });
 
-              debugLog(`PnP Monitor Statistics:`);
+              debugLog(`\nPnP Monitor Statistics:`);
               debugLog(
                 `${LOG_STYLES.INDENT}${LOG_STYLES.BULLET}Total monitors detected: ${totalPnP}`
               );
@@ -555,9 +543,6 @@ async function getDetailedDisplayInfo() {
     `${LOG_STYLES.INDENT}${LOG_STYLES.BULLET}Primary Display ID: ${displayInfo.primary}`
   );
 
-  // Log the full display info object if in development mode
-  debugLog(`\nFull display information:`);
-
   // Create a tabular representation for displays
   if (displayInfo.displays && displayInfo.displays.length > 0) {
     // Extract simple display properties for tabular display
@@ -569,21 +554,16 @@ async function getDetailedDisplayInfo() {
       Scale: d.scaleFactor,
       Position: `(${d.bounds.x},${d.bounds.y})`,
     }));
-
-    // Log displays in tabular format for better readability
-    debugLog(`Display Details Table:`);
-    console.log(formatTableForLog(displaySummary));
+    debugLog(`\n`);
+    debugLog(formatTableForLog(displaySummary));
   }
 
-  // Also log the full object using our custom formatter
-  try {
-    // Create a cleaner version of the object for logging
-    const logObj = { ...displayInfo };
-    console.log(formatObjectForLog(logObj));
-  } catch (err) {
-    // Fallback to native console.dir
-    console.dir(displayInfo, { depth: null, colors: false });
-  }
+  // try {
+  //   const logObj = { ...displayInfo };
+  //   console.log(formatObjectForLog(logObj));
+  // } catch (err) {
+  //   console.dir(displayInfo, { depth: null, colors: false });
+  // }
 
   return displayInfo;
 }

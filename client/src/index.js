@@ -247,28 +247,6 @@ ipcMain.handle("get-detailed-displays", async () => {
   }
 });
 
-ipcMain.handle("window-minimize", () => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.minimize();
-  }
-});
-
-ipcMain.handle("window-maximize", () => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    if (mainWindow.isMaximized()) {
-      mainWindow.unmaximize();
-    } else {
-      mainWindow.maximize();
-    }
-  }
-});
-
-ipcMain.handle("window-close", () => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.close();
-  }
-});
-
 ipcMain.handle("window-is-maximized", () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     return mainWindow.isMaximized();
@@ -276,25 +254,39 @@ ipcMain.handle("window-is-maximized", () => {
   return false;
 });
 
+// Window control event handlers
 ipcMain.on("window-minimize", () => {
-  if (mainWindow) {
+  console.log("Main process: Received window-minimize event");
+  if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.minimize();
+    console.log("Main process: Window minimized");
+  } else {
+    console.log("Main process: Window is not available for minimize");
   }
 });
 
 ipcMain.on("window-maximize", () => {
-  if (mainWindow) {
+  console.log("Main process: Received window-maximize event");
+  if (mainWindow && !mainWindow.isDestroyed()) {
     if (mainWindow.isMaximized()) {
       mainWindow.unmaximize();
+      console.log("Main process: Window unmaximized");
     } else {
       mainWindow.maximize();
+      console.log("Main process: Window maximized");
     }
+  } else {
+    console.log("Main process: Window is not available for maximize/unmaximize");
   }
 });
 
 ipcMain.on("window-close", () => {
-  if (mainWindow) {
+  console.log("Main process: Received window-close event");
+  if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.close();
+    console.log("Main process: Window closed");
+  } else {
+    console.log("Main process: Window is not available for close");
   }
 });
 

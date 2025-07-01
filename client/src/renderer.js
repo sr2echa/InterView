@@ -1,4 +1,3 @@
-// Global variables for WebRTC and WebSocket connections
 let ws;
 let peer;
 let currentCode = "";
@@ -11,6 +10,22 @@ let isUpdatingStreams = false;
 let lastLogMessage = "";
 let connectionTimeoutId = null;
 
+function debugLog(...args) {
+  if (window.debugEnabled) {
+    console.log(...args);
+  }
+}
+function debugError(...args) {
+  if (window.debugEnabled) {
+    console.error(...args);
+  }
+}
+function debugWarn(...args) {
+  if (window.debugEnabled) {
+    console.warn(...args);
+  }
+}
+
 // Configuration object - will be initialized when DOM is ready
 let appConfig = {
   isProduction: true,
@@ -18,29 +33,6 @@ let appConfig = {
   customWebSocketUrl: "",
   isDirectJoin: false, // Direct join mode enables automatic behaviors
 };
-
-// Debug logging utilities - only log when not in production
-// Uses ASCII characters for better terminal compatibility
-function debugLog(...args) {
-  if (!appConfig.isProduction) {
-    const timestamp = new Date().toISOString().split("T")[1].slice(0, -1);
-    console.log(`[${timestamp}] [RENDERER]`, ...args);
-  }
-}
-
-function debugError(...args) {
-  if (!appConfig.isProduction) {
-    const timestamp = new Date().toISOString().split("T")[1].slice(0, -1);
-    console.error(`[${timestamp}] [RENDERER ERROR]`, ...args);
-  }
-}
-
-function debugWarn(...args) {
-  if (!appConfig.isProduction) {
-    const timestamp = new Date().toISOString().split("T")[1].slice(0, -1);
-    console.warn(`[${timestamp}] [RENDERER WARNING]`, ...args);
-  }
-}
 
 // WebSocket URL based on configuration
 function getWebSocketURL() {

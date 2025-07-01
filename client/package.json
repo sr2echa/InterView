@@ -1,6 +1,6 @@
 {
-  "name": "interwu",
-  "productName": "Interwu",
+  "name": "@sr2echa/interwu",
+  "productName": "interwu",
   "version": "1.0.2",
   "description": "Client for Secure Remote Interview Monitoring.",
   "main": "src/index.js",
@@ -26,14 +26,17 @@
     "email": "65058816+sr2echa@users.noreply.github.com"
   },
   "license": "MIT",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/sr2echa/InterView.git",
+    "url": "https://github.com/sr2echa/interwu.git",
     "directory": "client"
   },
-  "homepage": "https://github.com/sr2echa/InterView",
+  "homepage": "https://interwu.now.sh",
   "bugs": {
-    "url": "https://github.com/sr2echa/InterView/issues"
+    "url": "https://github.com/sr2echa/interwu/issues"
   },
   "engines": {
     "node": ">=14.0.0"

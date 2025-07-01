@@ -13,7 +13,60 @@ if (fs.existsSync(envPath)) {
 
 // Parse command line arguments
 const args = process.argv.slice(2);
-const sessionCode = args[0];
+let sessionCode = null;
+let customWebSocketUrl = null;
+let showHelp = false;
+
+// Check for help flag
+if (args.includes("--help") || args.includes("-h")) {
+  showHelp = true;
+}
+
+if (showHelp) {
+  console.log(`
+🎯 InterWu - Remote Interview Monitoring CLI
+
+Usage:
+  interwu [session-code] [options]
+
+Arguments:
+  session-code    6-digit session code to join directly
+
+Options:
+  --local         Use localhost WebSocket (ws://localhost:3004)
+  --local=URL     Use custom WebSocket URL
+  --local URL     Use custom WebSocket URL
+  --help, -h      Show this help message
+
+
+Note: Custom WebSocket URLs should include the full ws:// or wss:// protocol.
+`);
+  process.exit(0);
+}
+
+// Parse arguments
+for (let i = 0; i < args.length; i++) {
+  const arg = args[i];
+
+  if (arg === "--local") {
+    // --local flag without value defaults to localhost
+    customWebSocketUrl = "ws://localhost:3004";
+  } else if (arg.startsWith("--local=")) {
+    // --local=url format
+    customWebSocketUrl = arg.split("=")[1];
+  } else if (
+    arg === "--local" &&
+    args[i + 1] &&
+    !args[i + 1].startsWith("--")
+  ) {
+    // --local url format (next argument is the URL)
+    customWebSocketUrl = args[i + 1];
+    i++; // Skip the next argument as it's the URL
+  } else if (!arg.startsWith("--") && !sessionCode) {
+    // First non-flag argument is the session code
+    sessionCode = arg;
+  }
+}
 
 // Path to the main Electron app
 const appPath = path.join(__dirname, "..", "src", "index.js");
@@ -28,6 +81,11 @@ env.IS_PRODUCTION = process.env.IS_PRODUCTION || "true";
 const electronArgs = [appPath];
 if (sessionCode) {
   electronArgs.push(`--session-code=${sessionCode}`);
+  console.log(`🎯 Joining session: ${sessionCode}`);
+}
+if (customWebSocketUrl) {
+  electronArgs.push(`--websocket-url=${customWebSocketUrl}`);
+  console.log(`🌐 Using WebSocket: ${customWebSocketUrl}`);
 }
 
 // Function to try spawning electron with shell option for Windows

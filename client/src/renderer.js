@@ -15,11 +15,17 @@ let connectionTimeoutId = null;
 let appConfig = {
   isProduction: false,
   sessionCode: "",
+  customWebSocketUrl: "",
   isDirectJoin: false, // Direct join mode enables automatic behaviors
 };
 
-// WebSocket URL based on production mode
+// WebSocket URL based on configuration
 function getWebSocketURL() {
+  // If custom WebSocket URL is provided, use it
+  if (appConfig.customWebSocketUrl) {
+    return appConfig.customWebSocketUrl;
+  }
+  // Otherwise, use production/development defaults
   return appConfig.isProduction ? "ws://ws.interwu.xyz" : "ws://localhost:3004";
 }
 

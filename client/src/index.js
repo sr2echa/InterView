@@ -26,6 +26,10 @@ let mainWindow;
 const args = process.argv.slice(2);
 const sessionCodeArg = args.find((arg) => arg.startsWith("--session-code="));
 const sessionCode = sessionCodeArg ? sessionCodeArg.split("=")[1] : null;
+const webSocketUrlArg = args.find((arg) => arg.startsWith("--websocket-url="));
+const customWebSocketUrl = webSocketUrlArg
+  ? webSocketUrlArg.split("=")[1]
+  : null;
 const isDirectJoin = !!sessionCode; // If session code is provided, we're in direct join mode
 
 // Environment variables
@@ -43,6 +47,7 @@ function createWindow() {
       additionalArguments: [
         `--is-production=${IS_PRODUCTION}`,
         `--session-code=${sessionCode || ""}`,
+        `--websocket-url=${customWebSocketUrl || ""}`,
       ],
     },
     autoHideMenuBar: true,

@@ -1,4 +1,6 @@
-# Interwu
+<samp>
+
+# Interwu CLI
 
 A remote screen sharing client for technical interviews and remote assistance.
 
@@ -55,11 +57,13 @@ This connects to `ws://localhost:3004` instead of the production server.
 
 You can also mention custom WebSocket server:
 
-````bash
+```bash
 interwu --local "ws://localhost:6969"
-``` or ```bash
+```
+or 
+```bash
 interwu --local=ws://localhost:6969
-````
+```
 
 ## Development Environment
 
@@ -97,3 +101,5 @@ This will:
 - **Auto-Reconnect:** Automatically reconnects if the connection drops
 - **Display Change Detection:** Automatically adapts to display configuration changes
 - **Process Monitoring:** Shares system process information with viewers
+
+</samp>

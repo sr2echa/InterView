@@ -89,11 +89,11 @@ This will:
 
 ## Features
 
-**Screen Sharing:** Share your screen with remote viewers
-**Multi-Monitor Support:** Capture from multiple displays
-**Real-time Statistics:** Display count, active streams, and system info
-**Cross-Platform:** Works on Windows, macOS, and Linux
-**CLI Interface:** Command-line usage for automation and scripting
-**Auto-Reconnect:** Automatically reconnects if the connection drops
-**Display Change Detection:** Automatically adapts to display configuration changes
-**Process Monitoring:** Shares system process information with viewers
+- **Screen Sharing:** Share your screen with remote viewers
+- **Multi-Monitor Support:** Capture from multiple displays
+- **Real-time Statistics:** Display count, active streams, and system info
+- **Cross-Platform:** Works on Windows, macOS, and Linux
+- **CLI Interface:** Command-line usage for automation and scripting
+- **Auto-Reconnect:** Automatically reconnects if the connection drops
+- **Display Change Detection:** Automatically adapts to display configuration changes
+- **Process Monitoring:** Shares system process information with viewers

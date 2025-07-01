@@ -1,4 +1,3 @@
-// Global variables for WebRTC and WebSocket connections
 let ws;
 let peer;
 let currentCode = "";
@@ -11,16 +10,47 @@ let isUpdatingStreams = false;
 let lastLogMessage = "";
 let connectionTimeoutId = null;
 
+function debugLog(...args) {
+  if (window.debugEnabled) {
+    console.log(...args);
+  }
+}
+function debugError(...args) {
+  if (window.debugEnabled) {
+    console.error(...args);
+  }
+}
+function debugWarn(...args) {
+  if (window.debugEnabled) {
+    console.warn(...args);
+  }
+}
+
 // Configuration object - will be initialized when DOM is ready
 let appConfig = {
-  isProduction: false,
+  isProduction: true,
   sessionCode: "",
+  customWebSocketUrl: "",
   isDirectJoin: false, // Direct join mode enables automatic behaviors
 };
 
-// WebSocket URL based on production mode
+// WebSocket URL based on configuration
 function getWebSocketURL() {
-  return appConfig.isProduction ? "ws://ws.interwu.xyz" : "ws://localhost:3004";
+  // If custom WebSocket URL is provided, use it
+  if (appConfig.customWebSocketUrl) {
+    debugLog(`Using custom WebSocket URL: ${appConfig.customWebSocketUrl}`);
+    return appConfig.customWebSocketUrl;
+  }
+  // Otherwise, use production/development defaults
+  const url = appConfig.isProduction
+    ? "ws://140.245.4.159:13004"
+    : "ws://localhost:3004";
+  debugLog(
+    `Using ${
+      appConfig.isProduction ? "production" : "development"
+    } WebSocket URL: ${url}`
+  );
+  return url;
 }
 
 // UI elements - will be initialized when DOM is ready
@@ -56,14 +86,14 @@ let logsPanel;
 document.addEventListener("DOMContentLoaded", initializeApp);
 
 function initializeApp() {
-  console.log("Initializing app...");
+  debugLog("Initializing app...");
 
   // Get configuration from global config object exposed by preload script
   if (window.config) {
     appConfig = window.config;
-    console.log("Configuration loaded:", appConfig);
+    debugLog("Configuration loaded:", appConfig);
   } else {
-    console.warn("No configuration found, using defaults");
+    debugWarn("No configuration found, using defaults");
   }
 
   // Initialize UI elements
@@ -82,7 +112,7 @@ function initializeApp() {
   // Set up window controls for custom title bar
   setupWindowControls();
 
-  console.log("UI elements found:", {
+  debugLog("UI elements found:", {
     codeEntryContainer: !!codeEntryContainer,
     dashboardContainer: !!dashboardContainer,
     codeInputs: codeInputs.length,
@@ -107,7 +137,7 @@ function initializeApp() {
 
   // Handle direct join mode
   if (appConfig.sessionCode && appConfig.sessionCode.length === 6) {
-    console.log("Direct join mode detected, skipping code entry screen");
+    debugLog("Direct join mode detected, skipping code entry screen");
     currentCode = appConfig.sessionCode;
 
     // Hide code entry and show dashboard immediately
@@ -130,14 +160,14 @@ function initializeApp() {
     if (codeEntryContainer) {
       codeEntryContainer.style.display = "flex";
       codeEntryContainer.classList.remove("hidden");
-      console.log("Code entry container made visible");
+      debugLog("Code entry container made visible");
     }
 
     // Ensure the dashboard is hidden initially
     if (dashboardContainer) {
       dashboardContainer.style.display = "none";
       dashboardContainer.classList.remove("visible");
-      console.log("Dashboard container hidden");
+      debugLog("Dashboard container hidden");
     }
   }
 
@@ -293,14 +323,11 @@ function setupEventListeners() {
   // Handle display configuration changes
   if (window.electronAPI) {
     window.electronAPI.onDisplayConfigurationChanged?.((event, displayInfo) => {
-      console.log("Display configuration changed:", displayInfo);
+      debugLog("Display configuration changed:", displayInfo);
 
       // If we received display info directly, update the UI right away
       if (displayInfo) {
-        console.log(
-          "Received fresh display info with change event:",
-          displayInfo
-        );
+        debugLog("Received fresh display info with change event:", displayInfo);
         updateDisplayInfoUI(displayInfo);
       }
 
@@ -350,19 +377,19 @@ async function connectToSession() {
         const message = JSON.parse(event.data);
         await handleWebSocketMessage(message);
       } catch (error) {
-        console.error("Error handling WebSocket message:", error);
+        debugError("Error handling WebSocket message:", error);
         logStatus(`Message handling error: ${error.message}`, "error");
       }
     };
 
     ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
+      debugError("WebSocket error:", error);
       logStatus("Connection error", "error");
       updateUI("disconnected");
     };
 
     ws.onclose = (event) => {
-      console.log("WebSocket closed:", event.code, event.reason);
+      debugLog("WebSocket closed:", event.code, event.reason);
       logStatus("Disconnected from server", "warning");
       updateUI("disconnected");
 
@@ -373,7 +400,7 @@ async function connectToSession() {
       }
     };
   } catch (error) {
-    console.error("Connection error:", error);
+    debugError("Connection error:", error);
     logStatus(`Connection failed: ${error.message}`, "error");
     updateUI("disconnected");
   }
@@ -434,7 +461,7 @@ async function handleWebSocketMessage(message) {
       break;
 
     default:
-      console.log("Unknown message type:", type);
+      debugLog("Unknown message type:", type);
   }
 }
 
@@ -467,10 +494,10 @@ async function handleWebRTCSignal(signal) {
         })
       );
     } else {
-      console.log("Unknown signal type:", signal.type);
+      debugLog("Unknown signal type:", signal.type);
     }
   } catch (error) {
-    console.error("WebRTC signaling error:", error);
+    debugError("WebRTC signaling error:", error);
     logStatus(`WebRTC error: ${error.message}`, "error");
   }
 }
@@ -491,7 +518,7 @@ async function handleAdminCommand(payload) {
       break;
 
     default:
-      console.log("Unknown admin command:", command);
+      debugLog("Unknown admin command:", command);
   }
 }
 
@@ -524,7 +551,7 @@ async function initializeStreaming() {
     };
 
     peer.onconnectionstatechange = () => {
-      console.log("Peer connection state:", peer.connectionState);
+      debugLog("Peer connection state:", peer.connectionState);
       logStatus(`WebRTC: ${peer.connectionState}`, "info");
 
       if (peer.connectionState === "connected") {
@@ -538,7 +565,7 @@ async function initializeStreaming() {
 
     logStatus("WebRTC peer connection initialized", "success");
   } catch (error) {
-    console.error("Error initializing WebRTC:", error);
+    debugError("Error initializing WebRTC:", error);
     logStatus(`WebRTC initialization failed: ${error.message}`, "error");
   }
 }
@@ -576,7 +603,7 @@ async function startScreenCapture() {
           try {
             peer.removeTrack(sender);
           } catch (err) {
-            console.warn("Error removing track during cleanup:", err);
+            debugWarn("Error removing track during cleanup:", err);
           }
         }
       });
@@ -588,7 +615,7 @@ async function startScreenCapture() {
         try {
           track.stop();
         } catch (err) {
-          console.warn("Error stopping track:", err);
+          debugWarn("Error stopping track:", err);
         }
       });
     });
@@ -633,7 +660,7 @@ async function startScreenCapture() {
             peer.addTrack(track, stream);
             logStatus(`Added track for screen "${source.name}"`, "success");
           } catch (err) {
-            console.error(`Error adding track for screen ${source.name}:`, err);
+            debugError(`Error adding track for screen ${source.name}:`, err);
             track.stop(); // Clean up the track if we couldn't add it
           }
         });
@@ -641,7 +668,7 @@ async function startScreenCapture() {
         activeStreams.push(stream);
         logStatus(`Screen "${source.name}" capture started`, "success");
       } catch (error) {
-        console.error(`Error capturing screen ${source.name}:`, error);
+        debugError(`Error capturing screen ${source.name}:`, error);
         logStatus(`Failed to capture screen: ${source.name}`, "error");
       }
     }
@@ -675,7 +702,7 @@ async function startScreenCapture() {
 
     await updateDisplayInfo();
   } catch (error) {
-    console.error("Error starting screen capture:", error);
+    debugError("Error starting screen capture:", error);
     logStatus(`Screen capture failed: ${error.message}`, "error");
   }
 }
@@ -732,7 +759,7 @@ async function refreshScreenCapture() {
         "success"
       );
     } catch (error) {
-      console.error("Error refreshing screen capture:", error);
+      debugError("Error refreshing screen capture:", error);
       logStatus(`Failed to refresh screen capture: ${error.message}`, "error");
 
       // Notify viewer of error
@@ -796,7 +823,7 @@ function scheduleReconnect() {
 
 // Update UI based on connection state
 function updateUI(state) {
-  console.log(`Updating UI to state: ${state}`);
+  debugLog(`Updating UI to state: ${state}`);
 
   switch (state) {
     case "connecting":
@@ -806,7 +833,7 @@ function updateUI(state) {
       break;
 
     case "connected":
-      console.log("Switching to dashboard view");
+      debugLog("Switching to dashboard view");
       codeEntryContainer.classList.add("hidden");
       codeEntryContainer.style.display = "none";
       dashboardContainer.style.display = "flex";
@@ -818,11 +845,11 @@ function updateUI(state) {
       // Update active streams counter
       const activeStreamsEl = document.getElementById("active-streams");
       if (activeStreamsEl) activeStreamsEl.textContent = activeStreams.length;
-      console.log("Dashboard should now be visible");
+      debugLog("Dashboard should now be visible");
       break;
 
     case "disconnected":
-      console.log("Switching to code entry view");
+      debugLog("Switching to code entry view");
       codeEntryContainer.style.display = "flex";
       codeEntryContainer.classList.remove("hidden");
       dashboardContainer.style.display = "none";
@@ -834,7 +861,7 @@ function updateUI(state) {
       // Reset counters
       const activeStreamsElReset = document.getElementById("active-streams");
       if (activeStreamsElReset) activeStreamsElReset.textContent = "0";
-      console.log("Code entry should now be visible");
+      debugLog("Code entry should now be visible");
       break;
   }
 }
@@ -845,7 +872,7 @@ async function updateDisplayInfo(forceUpdate = false) {
     const displays = await window.electronAPI.getDetailedDisplays();
 
     // Log detailed display info for debugging
-    console.log("Display Info:", JSON.stringify(displays, null, 2));
+    debugLog("Display Info:", JSON.stringify(displays, null, 2));
 
     // Update the UI with the fresh display information
     updateDisplayInfoUI(displays);
@@ -884,13 +911,13 @@ async function updateDisplayInfo(forceUpdate = false) {
           })
         );
       } catch (error) {
-        console.error("Error getting process info:", error);
+        debugError("Error getting process info:", error);
       }
     }
 
     return displays;
   } catch (error) {
-    console.error("Error updating display info:", error);
+    debugError("Error updating display info:", error);
     logStatus(`Display update error: ${error.message}`, "error");
     return null;
   }
@@ -900,14 +927,14 @@ async function updateDisplayInfo(forceUpdate = false) {
 function updateDisplayInfoUI(displays) {
   if (!displays) return;
 
-  console.log("Updating display info UI:", JSON.stringify(displays, null, 2));
+  debugLog("Updating display info UI:", JSON.stringify(displays, null, 2));
 
   // Update stats
   if (totalDisplaysEl) {
     // Calculate total displays (detected + inactive)
     const totalDisplays = (displays.inactive || 0) + displays.total;
     totalDisplaysEl.textContent = totalDisplays;
-    console.log(
+    debugLog(
       `Updated Total Displays UI: ${totalDisplays} (${
         displays.total
       } active + ${displays.inactive || 0} inactive)`
@@ -1115,7 +1142,7 @@ function handleDisplayConfigurationChange(receivedDisplayInfo) {
 
 // Log status messages
 function logStatus(message, type = "info") {
-  console.log(`[${type.toUpperCase()}] ${message}`);
+  debugLog(`[${type.toUpperCase()}] ${message}`);
 
   if (logContainer) {
     const logEntry = document.createElement("div");
@@ -1184,7 +1211,7 @@ function setupWindowControls() {
     closeLogsBtn.addEventListener("click", toggleLogsPanel);
   }
 
-  console.log("Window controls setup complete");
+  debugLog("Window controls setup complete");
 }
 
 function toggleLogsPanel() {
@@ -1204,40 +1231,38 @@ function toggleLogsPanel() {
 }
 
 function cleanupMediaResources() {
-  console.log("Cleaning up media resources");
+  debugLog("Cleaning up media resources");
 
   // Clean up all senders if peer exists
   if (peer) {
     const senders = peer.getSenders();
-    console.log(`Removing ${senders.length} senders from peer connection`);
+    debugLog(`Removing ${senders.length} senders from peer connection`);
 
     senders.forEach((sender) => {
       if (sender.track) {
         try {
-          console.log(
-            `Stopping track: ${sender.track.id} (${sender.track.kind})`
-          );
+          debugLog(`Stopping track: ${sender.track.id} (${sender.track.kind})`);
           sender.track.stop();
           peer.removeTrack(sender);
         } catch (err) {
-          console.warn("Error cleaning up sender:", err);
+          debugWarn("Error cleaning up sender:", err);
         }
       }
     });
   }
 
   // Clean up all streams
-  console.log(`Stopping ${activeStreams.length} active streams`);
+  debugLog(`Stopping ${activeStreams.length} active streams`);
   activeStreams.forEach((stream) => {
     const tracks = stream.getTracks();
-    console.log(`Stopping ${tracks.length} tracks for stream ${stream.id}`);
+    debugLog(`Stopping ${tracks.length} tracks for stream ${stream.id}`);
 
     tracks.forEach((track) => {
       try {
-        console.log(`Stopping track: ${track.id} (${track.kind})`);
+        debugLog(`Stopping track: ${track.id} (${track.kind})`);
         track.stop();
       } catch (err) {
-        console.warn("Error stopping track:", err);
+        debugWarn("Error stopping track:", err);
       }
     });
   });

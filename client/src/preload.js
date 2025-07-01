@@ -7,6 +7,8 @@ const isProduction =
   "true";
 const sessionCode =
   args.find((arg) => arg.startsWith("--session-code="))?.split("=")[1] || "";
+const customWebSocketUrl =
+  args.find((arg) => arg.startsWith("--websocket-url="))?.split("=")[1] || "";
 
 // Determine if we're in direct join mode (session code is provided)
 const isDirectJoin = !!sessionCode;
@@ -36,6 +38,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 contextBridge.exposeInMainWorld("config", {
   isProduction,
   sessionCode,
+  customWebSocketUrl,
   isDirectJoin, // Indicates if we should skip code entry and join directly
 });
 

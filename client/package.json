@@ -1,7 +1,7 @@
 {
   "name": "interwu",
   "productName": "Interwu",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Client for Secure Remote Interview Monitoring.",
   "main": "src/index.js",
   "bin": {

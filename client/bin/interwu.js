@@ -4,6 +4,7 @@ const { spawn } = require("child_process");
 const path = require("path");
 const os = require("os");
 const fs = require("fs");
+const { debugLog, debugError } = require("../src/displayUtils");
 
 // Load environment variables from .env file if it exists
 const envPath = path.join(__dirname, "..", ".env");
@@ -13,7 +14,60 @@ if (fs.existsSync(envPath)) {
 
 // Parse command line arguments
 const args = process.argv.slice(2);
-const sessionCode = args[0];
+let sessionCode = null;
+let customWebSocketUrl = null;
+let showHelp = false;
+
+// Check for help flag
+if (args.includes("--help") || args.includes("-h")) {
+  showHelp = true;
+}
+
+if (showHelp) {
+  console.log(`
+🎯 InterWu - Remote Interview Monitoring CLI
+
+Usage:
+  interwu [session-code] [options]
+
+Arguments:
+  session-code    6-digit session code to join directly
+
+Options:
+  --local         Use localhost WebSocket (ws://localhost:3004)
+  --local=URL     Use custom WebSocket URL
+  --local URL     Use custom WebSocket URL
+  --help, -h      Show this help message
+
+
+Note: Custom WebSocket URLs should include the full ws:// or wss:// protocol.
+`);
+  process.exit(0);
+}
+
+// Parse arguments
+for (let i = 0; i < args.length; i++) {
+  const arg = args[i];
+
+  if (arg === "--local") {
+    // --local flag without value defaults to localhost
+    customWebSocketUrl = "ws://localhost:3004";
+  } else if (arg.startsWith("--local=")) {
+    // --local=url format
+    customWebSocketUrl = arg.split("=")[1];
+  } else if (
+    arg === "--local" &&
+    args[i + 1] &&
+    !args[i + 1].startsWith("--")
+  ) {
+    // --local url format (next argument is the URL)
+    customWebSocketUrl = args[i + 1];
+    i++; // Skip the next argument as it's the URL
+  } else if (!arg.startsWith("--") && !sessionCode) {
+    // First non-flag argument is the session code
+    sessionCode = arg;
+  }
+}
 
 // Path to the main Electron app
 const appPath = path.join(__dirname, "..", "src", "index.js");
@@ -28,12 +82,17 @@ env.IS_PRODUCTION = process.env.IS_PRODUCTION || "true";
 const electronArgs = [appPath];
 if (sessionCode) {
   electronArgs.push(`--session-code=${sessionCode}`);
+  debugLog(`🎯 Joining session: ${sessionCode}`);
+}
+if (customWebSocketUrl) {
+  electronArgs.push(`--websocket-url=${customWebSocketUrl}`);
+  debugLog(`🌐 Using WebSocket: ${customWebSocketUrl}`);
 }
 
 // Function to try spawning electron with shell option for Windows
 function tryElectron(electronCmd, args, useShell = false) {
   return new Promise((resolve, reject) => {
-    console.log(`Attempting to launch: ${electronCmd} ${args.join(" ")}`);
+    debugLog(`Attempting to launch: ${electronCmd} ${args.join(" ")}`);
     const child = spawn(electronCmd, args, {
       env,
       stdio: "inherit",
@@ -133,7 +192,7 @@ function findElectronExecutable() {
   // Check which path exists
   for (const electronPath of possiblePaths) {
     if (fs.existsSync(electronPath)) {
-      console.log(`Found Electron at: ${electronPath}`);
+      debugLog(`Found Electron at: ${electronPath}`);
       return electronPath;
     }
   }
@@ -181,7 +240,7 @@ function findGlobalElectronInPackage() {
   // Check which path exists
   for (const electronPath of possiblePaths) {
     if (fs.existsSync(electronPath)) {
-      console.log(`Found bundled Electron at: ${electronPath}`);
+      debugLog(`Found bundled Electron at: ${electronPath}`);
       return electronPath;
     }
   }
@@ -229,7 +288,7 @@ function findGlobalElectronInPackage() {
   // Check which path exists
   for (const electronPath of possiblePaths) {
     if (fs.existsSync(electronPath)) {
-      console.log(`Found bundled Electron at: ${electronPath}`);
+      debugLog(`Found bundled Electron at: ${electronPath}`);
       return electronPath;
     }
   }
@@ -244,25 +303,25 @@ async function main() {
 
   if (electronPath) {
     try {
-      console.log("Using local Electron installation...");
+      debugLog("Using local Electron installation...");
       const exitCode = await tryElectron(electronPath, electronArgs, false);
       process.exit(exitCode);
     } catch (err) {
-      console.error("Failed to start with local Electron:", err.message);
+      debugError("Failed to start with local Electron:", err.message);
     }
   }
 
   // Try globally installed electron
   try {
-    console.log("Trying to use globally installed Electron...");
+    debugLog("Trying to use globally installed Electron...");
     const exitCode = await tryElectron("electron", electronArgs, false);
     process.exit(exitCode);
   } catch (fallbackErr) {
-    console.error("Failed to start with global Electron:", fallbackErr.message);
+    debugError("Failed to start with global Electron:", fallbackErr.message);
 
     // Try npx electron as fallback
     try {
-      console.log("Trying npx electron as fallback...");
+      debugLog("Trying npx electron as fallback...");
       const exitCode = await tryElectron(
         "npx",
         ["electron", ...electronArgs],
@@ -270,11 +329,11 @@ async function main() {
       );
       process.exit(exitCode);
     } catch (npxErr) {
-      console.error("Failed with npx electron:", npxErr.message);
+      debugError("Failed with npx electron:", npxErr.message);
 
       // Try finding bundled electron in the global package
       try {
-        console.log("Trying bundled Electron in global package...");
+        debugLog("Trying bundled Electron in global package...");
         const globalElectronPath = findGlobalElectronInPackage();
         if (globalElectronPath) {
           const exitCode = await tryElectron(
@@ -286,19 +345,22 @@ async function main() {
         }
         throw new Error("No bundled Electron found");
       } catch (bundledErr) {
-        console.error("\n❌ All Electron launch methods failed.");
-        console.error("\n🔧 To fix this issue, try one of the following:");
-        console.error("  1. Install Electron globally:");
-        console.error("     npm install -g electron@latest");
-        console.error("  2. Clear npm cache and try again:");
-        console.error("     npm cache clean --force");
-        console.error("     npx interwu [code]");
-        console.error("  3. Use local installation:");
-        console.error("     npm install interwu");
-        console.error("     npx interwu [code]");
-        console.error(
-          "\n📝 Note: If using pnpm, replace 'npm' with 'pnpm' in the commands above."
-        );
+        console.error(`
+❌ All Electron launch methods failed.
+🔧 To fix this issue, try one of the following:
+
+  1. Install Electron globally:
+     npm install -g electron@latest
+
+  2. Clear npm cache and try again:
+     npm cache clean --force
+     npx interwu [code]
+     
+  3. Use local installation:
+     npm install interwu
+     npx interwu [code]
+
+\n📝 Note: If using pnpm, replace 'npm' with 'pnpm' in the commands above.`);
         process.exit(1);
       }
     }

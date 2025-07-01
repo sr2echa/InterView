@@ -1,0 +1,55 @@
+name: Publish to both GitHub & npm
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        registry: [github, npm]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          registry-url: ${{ matrix.registry == 'github' && 'https://npm.pkg.github.com' || 'https://registry.npmjs.org' }}
+          scope: "@sr2echa"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: Install deps
+        run: |
+          cd client
+          pnpm install
+
+      - name: Adjust package name for npmjs (only)
+        if: matrix.registry == 'npm'
+        run: |
+          cd client
+          jq '.name = "interwu" | .publishConfig.registry = "https://registry.npmjs.org/"' package.json > tmp && mv tmp package.json
+
+      - name: Build and Test
+        run: |
+          cd client
+          pnpm test --if-present
+          npm pack
+
+      - name: Publish
+        run: |
+          cd client
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ matrix.registry == 'github' && secrets.GH_NPM_TOKEN || secrets.NPM_TOKEN }}

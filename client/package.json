@@ -1,7 +1,7 @@
 {
   "name": "@sr2echa/interwu",
   "productName": "interwu",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Client for Secure Remote Interview Monitoring.",
   "main": "src/index.js",
   "bin": {

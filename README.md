@@ -46,12 +46,12 @@ Will post a video demo soon
 ## ToDo
 
 - Code Refactoring
-- Switch to env for Backend WebSocket URL
+- ~~Switch to env for Backend WebSocket URL~~
 - Enhance the Process Page.
   - Add active tabs and known apps running in the background
   - Detect Keystrokes
   - Remote kill processes (with precautions ofc)
-- Make the client into npm pkg
+- ~~Make the client into npm pkg~~
 - Optimize WebRTC implimentation
 - Check if screen is being mirrored or duplicated (requieres a C++/C# implimentation to access system level info of DisplaySwitch.exe's current state)
 - Test across other platforms
